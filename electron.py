@@ -192,6 +192,54 @@ def construct_braid_hamiltonian_ansatz2b(spin_network, embedded_braid):
     return total_energy_natural
 
 
+def construct_braid_hamiltonian_ansatz2d(spin_network, embedded_braid, epsilon):
+    """
+    Calculates conceptual ground state energy based on Ansatz 2d:
+    Imperfect cancellation between Geometric Area and Topological Charge terms.
+    Returns energy in Planck units.
+    """
+    print(f"INFO: Constructing H_local (Ansatz 2d: Imperfect Cancellation, epsilon={epsilon:.2e}) for '{embedded_braid.name}'.")
+
+    braid_edge_ids = embedded_braid.edge_ids
+    charge_q = embedded_braid.get_charge()
+
+    # --- Coefficients ---
+    C_geom_A = AREA_OPERATOR_NATURAL_CONST # Geometric Area term strength
+    # C_charge is now implicitly (1 - epsilon) * C_geom_A
+    # Set other coefficients to zero for this simplified test
+    C_kin = 0.0
+    C_top = 0.0
+    C_geom_V = 0.0
+    C_int = 0.0
+
+    # --- Calculate Term Contributions (Dimensionless factors) ---
+    area_term_dimless = lqg_area_term_contribution(spin_network, braid_edge_ids)
+
+    # --- Calculate Energy Contributions (Planck Units) ---
+    E_geom_A = C_geom_A * area_term_dimless
+    # Imperfect Cancellation: Charge term is slightly weaker
+    E_top_charge = -(1.0 - epsilon) * C_geom_A * abs(charge_q) * area_term_dimless
+
+    # Other terms are zero in this simplified version
+    E_kin = C_kin # = 0
+    E_top = C_top # = 0
+    E_geom_V = C_geom_V # = 0
+    E_int = C_int # = 0
+
+    print(f"  Hamiltonian Term Contributions (Planck Units):")
+    print(f"    Geometric Area (+)    : {E_geom_A:.4e}")
+    print(f"    Topological Charge (-): {E_top_charge:.4e} (using epsilon={epsilon:.2e})")
+
+    # The residual is the dominant energy term now
+    E_cancellation_residual = E_geom_A + E_top_charge
+    total_energy_natural = E_kin + E_top + E_geom_V + E_int + E_cancellation_residual
+
+    print(f"  Cancellation Residual (E_geom_A + E_top_charge): {E_cancellation_residual:.4e}")
+    print(f"  Total Ground State Energy (Conceptual): {total_energy_natural:.4e} [E_planck]")
+
+    return total_energy_natural
+
+
 def analyze_braid_mass_ansatz2b(spin_network, embedded_braid):
     """Estimate mass from the Ansatz 2b Hamiltonian."""
     print(f"\n--- Analyzing Mass/Energy (Ansatz 2b: Dynamic Charged Braid) ---")
@@ -212,9 +260,29 @@ def analyze_braid_mass_ansatz2b(spin_network, embedded_braid):
     print("--------------------------------------------------------------")
     return mass_estimate_kg
 
+
+def analyze_braid_mass_ansatz2d(spin_network, embedded_braid, epsilon):
+    """Estimate mass from the Ansatz 2d Hamiltonian."""
+    print(f"\n--- Analyzing Mass/Energy (Ansatz 2d: Imperfect Cancellation) ---")
+    ground_state_energy_natural = construct_braid_hamiltonian_ansatz2d(spin_network, embedded_braid, epsilon)
+    # ... (rest of mass calculation and printing as before) ...
+    if ground_state_energy_natural <= 0:
+         print("Warning: Conceptual ground state energy is non-positive/zero.")
+         mass_estimate_kg = 0.0
+    else:
+        mass_estimate_kg = ground_state_energy_natural * planck_mass_kg
+
+    print(f"\nEstimated Ground State Mass (Ansatz 2d, kg): {mass_estimate_kg:.2e}")
+    print(f"Actual Electron Mass (kg): {electron_mass_kg:.2e}")
+    ratio = mass_estimate_kg / electron_mass_kg if electron_mass_kg and mass_estimate_kg > 0 else float('inf')
+    print(f"Ratio to Electron Mass: {ratio:.2e}")
+    print("--------------------------------------------------------------")
+    return mass_estimate_kg
+
+
 # --- Main Execution ---
 if __name__ == "__main__":
-    print("--- Running LSC Ansatz 2b Simulation ---")
+    print("--- Running LSC Ansatz 2d Simulation (Imperfect Cancellation) ---")
 
     # 1. Create Background Spin Network (Minimal)
     sn_base = SpinNetwork()
@@ -262,12 +330,24 @@ if __name__ == "__main__":
     spin_result = verify_spinor_transformation(electron_braid)
     print(f"\n>>> Run 1 Output: Spin Analysis Completed. Is Spinor-like: {spin_result}")
 
-    # 4. Analyze Mass using Dynamic Model Ansatz 2b
-    # >> Point for running and sharing output <<
-    # How close is the mass now, with the cancellation term? Does it depend heavily on coefficients?
-    mass_result = analyze_braid_mass_ansatz2b(sn_base, electron_braid)
-    print(f"\n>>> Run 2 Output: Mass Analysis (Ansatz 2b). Estimated Mass (kg): {mass_result:.2e}")
+    # Calculate the required epsilon
+    area_term_sum_val = lqg_area_term_contribution(sn_base, electron_braid.edge_ids)
+    target_energy_natural = electron_mass_kg / planck_mass_kg
+    required_epsilon = target_energy_natural / (AREA_OPERATOR_NATURAL_CONST * abs(electron_braid.get_charge()) * area_term_sum_val)
+    print(f"\nTarget energy (Planck units): {target_energy_natural:.2e}")
+    print(f"Area term sum (dimless): {area_term_sum_val:.3f}")
+    print(f"Required epsilon for electron mass: {required_epsilon:.2e}")
 
+    # Run with the calculated epsilon
+    mass_result = analyze_braid_mass_ansatz2d(sn_base, electron_braid, epsilon=required_epsilon)
+    print(f"\n>>> Run 2 Output: Mass Analysis (Ansatz 2d, Epsilon={required_epsilon:.2e}). Estimated Mass (kg): {mass_result:.2e}")
+
+    # Optional: Run with a slightly different epsilon to see sensitivity
+    # mass_result_perturbed = analyze_braid_mass_ansatz2d(sn_base, electron_braid, epsilon=required_epsilon * 1.1)
+
+    # For comparison, also run the original Ansatz 2b
+    mass_result_2b = analyze_braid_mass_ansatz2b(sn_base, electron_braid)
+    print(f"\n>>> Run 3 Output: Mass Analysis (Ansatz 2b). Estimated Mass (kg): {mass_result_2b:.2e}")
 
     print("\n--- Simulation Finished ---")
-    print("NOTE: Hamiltonian uses conceptual terms & coefficients. Cancellation is key.")
+    print("NOTE: Hamiltonian uses conceptual terms & coefficients. Imperfect cancellation is key.")
