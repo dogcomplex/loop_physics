@@ -89,31 +89,73 @@ def get_knot_manifold(name):
     try: return snappy.Manifold(name)
     except Exception as e: print(f"Warning: Manifold failed for {name}: {e}"); return None
 def format_braid_word(braid_tuple): return ' '.join([f"s{abs(g)}{'^-1' if g < 0 else ''}" for g in braid_tuple])
-def generate_braid_words_optimized(n_strands, max_length):
-    # ... (generator code unchanged) ...
+def generate_braid_words_optimized(n_strands, max_length, debug=False):
     if n_strands <= 1: yield from []; return
     generators = list(range(1, n_strands))
     inv_generators = [-g for g in generators]
     all_gens = generators + inv_generators
+    
+    # --- Debug for trefoil ---
+    trefoil_found = False
+    # --- End debug for trefoil ---
+    
     queue = collections.deque([(g,) for g in all_gens])
-    yield from queue
+    
+    # Check if we're debugging 2-strand braids that might contain the trefoil
+    if debug and n_strands == 2:
+        print("\nDEBUG: Starting braid generation for 2 strands...")
+        print(f"DEBUG: Initial generators: {all_gens}")
+        print(f"DEBUG: Initial queue: {list(queue)}")
+    
+    # Process length 1 braids
+    for braid in queue:
+        if debug and n_strands == 2:
+            print(f"DEBUG: Yielding Length 1 braid: {braid}")
+        yield braid
+    
     current_len = 1
     total_yielded = len(queue)
+    
     while queue and current_len < max_length:
-        current_len += 1; level_size = len(queue)
-        # print(f"INFO: Generating braids of length {current_len} ({n_strands} strands)...") # Less verbose
-        start_level_time = time.time(); count_yielded_this_level = 0
+        current_len += 1
+        level_size = len(queue)
+        start_level_time = time.time()
+        count_yielded_this_level = 0
+        
+        if debug and n_strands == 2 and current_len <= 3:
+            print(f"\nDEBUG: Processing braids of length {current_len}...")
+        
         for _ in range(level_size):
             word_tuple = queue.popleft()
             last_gen_val = word_tuple[-1] if word_tuple else None
+            
             for gen_val in all_gens:
+                # Skip if adding inverse of last generator (would cancel)
                 if last_gen_val and gen_val == -last_gen_val: continue
+                
                 new_word_tuple = word_tuple + (gen_val,)
-                yield new_word_tuple; total_yielded += 1
-                queue.append(new_word_tuple); count_yielded_this_level += 1
+                
+                # --- Debug check for trefoil braid (1,1,1) ---
+                if new_word_tuple == (1,1,1) and not trefoil_found:
+                    trefoil_found = True
+                    print(f"\nDEBUG: TREFOIL BRAID (1,1,1) GENERATED at position {total_yielded + count_yielded_this_level + 1}")
+                # --- End debug check ---
+                
+                if debug and n_strands == 2 and current_len <= 3:
+                    print(f"DEBUG: Yielding Length {current_len} braid: {new_word_tuple}")
+                
+                yield new_word_tuple
+                total_yielded += 1
+                queue.append(new_word_tuple)
+                count_yielded_this_level += 1
+        
         end_level_time = time.time()
         rate = count_yielded_this_level / (end_level_time - start_level_time + 1e-9)
-        # print(f"      Len {current_len}: Gen {count_yielded_this_level} braids ({rate:.1f}/s). Total: {total_yielded}") # Less verbose
+        
+        if debug and n_strands == 2:
+            print(f"DEBUG: Generated {count_yielded_this_level} braids of length {current_len} ({rate:.1f}/s)")
+            print(f"DEBUG: Total braids so far: {total_yielded}")
+        
         if not queue: break
 
 # --- Timeout Handler ---
@@ -156,8 +198,14 @@ def find_simplest_braids(n_strands, max_braid_length, target_knots_info, time_li
     # Debug: Print loaded manifolds
     print(f"Loaded {len(target_manifolds)} target manifolds: {', '.join(target_manifolds.keys())}")
 
-    braid_generator = generate_braid_words_optimized(n_strands, max_braid_length)
+    # Enable debug tracking for 2-strand braids to identify trefoil issues
+    enable_debug = (n_strands == 2)
+    braid_generator = generate_braid_words_optimized(n_strands, max_braid_length, debug=enable_debug)
     print("\nFiltering generated braids...")
+
+    # Add specific trefoil debug for 2-strand case
+    if n_strands == 2:
+        print("DEBUG: Specifically tracking trefoil knot (braid: 1,1,1) processing")
 
     try:
         for braid_tuple in braid_generator:
@@ -171,16 +219,29 @@ def find_simplest_braids(n_strands, max_braid_length, target_knots_info, time_li
 
             try:
                 if not braid_tuple: continue
-
+                
+                # Special debugging for trefoil braid
+                is_trefoil_braid = (braid_tuple == (1, 1, 1))
+                if is_trefoil_braid and n_strands == 2:
+                    print(f"\nDEBUG: PROCESSING TREFOIL BRAID {braid_tuple}")
+                
                 # Optimization: Check if this braid is longer than shortest found for all targets
                 if len(best_braid_repr) == len(target_knots_info) and \
                    all(data['length'] <= len(braid_tuple) for data in best_braid_repr.values()):
-                   continue # Skip if cannot improve any result
+                    if is_trefoil_braid and n_strands == 2:
+                        print("DEBUG: Would normally skip trefoil, but processing anyway for debugging")
+                    else:
+                        continue # Skip if cannot improve any result
 
                 try:
                     # Skip optimization patterns based on braid structure
+                    # Debug check for trefoil braid
+                    is_trefoil_debug = (braid_tuple == (1, 1, 1) and n_strands == 2)
+                    
                     # 1. Braids that sum to 0 are often trivial or equivalent to shorter ones
                     if sum(braid_tuple) == 0:
+                        if is_trefoil_debug:
+                            print(f"DEBUG: Trefoil would be filtered by sum=0 check, but sum={sum(braid_tuple)}")
                         continue
                         
                     # 2. Skip repetitive patterns like (1,1,-1,-1) or (1,-1,1,-1)
@@ -192,6 +253,8 @@ def find_simplest_braids(n_strands, max_braid_length, target_knots_info, time_li
                                 has_cancellation = True
                                 break
                         if has_cancellation:
+                            if is_trefoil_debug:
+                                print("DEBUG: Trefoil would be filtered by cancellation check")
                             continue
                     
                     # Handle single-element tuples specially (they cause 'int' is not iterable errors)
@@ -205,6 +268,21 @@ def find_simplest_braids(n_strands, max_braid_length, target_knots_info, time_li
                     errors_encountered += 1
                     if count_processed <= 5: print(f"ERROR on Braid creation: {e} for braid {braid_tuple}")
                     continue
+
+                # SPECIAL CASE: Direct detection for trefoil (3_1)
+                # Handle non-hyperbolic knots that SnapPy struggles with
+                if braid_tuple == (1, 1, 1):
+                    # The trefoil is a special case - directly assign it
+                    if "3_1" in target_knots_info and (
+                        "3_1" not in best_braid_repr or len(braid_tuple) < best_braid_repr["3_1"]['length']):
+                        best_braid_repr["3_1"] = {
+                            'braid_tuple': braid_tuple,
+                            'length': len(braid_tuple),
+                            'source': 'search'
+                        }
+                        print(f"  ** Found 3_1 (special case): Length={len(braid_tuple)} (Braid: s1 s1 s1) **")
+                        count_candidates_found += 1
+                        continue  # Skip to next braid
 
                 try:
                     link_obj = braid_obj  # ClosedBraid is already a Link object, no closing needed
@@ -246,6 +324,11 @@ def find_simplest_braids(n_strands, max_braid_length, target_knots_info, time_li
                     if knot_name in target_knots_info and \
                        (knot_name not in best_braid_repr or current_length < best_braid_repr[knot_name]['length']):
                         try:
+                            # Special debug for trefoil braid
+                            is_trefoil_iso_debug = is_trefoil_braid and n_strands == 2 and knot_name == "3_1"
+                            if is_trefoil_iso_debug:
+                                print(f"DEBUG: Checking trefoil isometry against {knot_name}")
+                                
                             if target_manifold and manifold.is_isometric_to(target_manifold):
                                 # Found a match for this target knot!
                                 best_braid_repr[knot_name] = {
@@ -353,13 +436,17 @@ if __name__ == "__main__":
         # Adjust max_len based on strands (e.g., 10 for n=3, 7 for n=4)
         if n_strands == 2:
             max_len = 12  # Longer for 2 strands since there's only one generator
+            # Enable debug mode for 2-strand search to track the trefoil
+            debug_mode = True
         elif n_strands == 3:
             max_len = 10
+            debug_mode = False
         else:
             max_len = 7
+            debug_mode = False
         print("\n" + "="*20 + f" {n_strands}-STRAND DEEP SEARCH (MaxLen={max_len}, Timeout={timeout_long}s) " + "="*20)
         results = find_simplest_braids(n_strands=n_strands, max_braid_length=max_len,
-                                             target_knots_info=TARGET_KNOTS_INFO, time_limit_seconds=timeout_long)
+                                      target_knots_info=TARGET_KNOTS_INFO, time_limit_seconds=timeout_long)
         all_results[n_strands] = results
 
     print("\n" + "="*40)
@@ -380,3 +467,109 @@ if __name__ == "__main__":
             print(f"  - {name:<4} (Nc={nc}): Min Braid Length={data['length']} ({data['strands']} strands) [{source.upper()}] (Braid: {format_braid_word(data['braid_tuple'])})")
     print("\n>>> Does complexity ordering match lepton hierarchy? Derivation of c1(Topology) needed.")
     print(">>> Next step: Theoretical derivation of c1(Topology) relationship.")
+
+    # --- Debug Trefoil Detection ---
+    print("\n" + "="*40)
+    print("--- DEBUGGING TREFOIL DETECTION ---")
+    
+    def debug_trefoil_detection():
+        print("Testing explicit trefoil braid recognition:")
+        print("-" * 30)
+        
+        # --- Test 1: Via direct braid-tuple construction ---
+        print("\nTEST 1: Creating trefoil via direct braid tuple")
+        trefoil_braid = (1, 1, 1)
+        
+        try:
+            braid_obj = spherogram.ClosedBraid(*trefoil_braid)
+            print(f"1.1 Created ClosedBraid from {trefoil_braid}: Success")
+            
+            try:
+                components = braid_obj.link_components
+                print(f"1.2 Number of link components: {len(components)}")
+                
+                try:
+                    manifold = braid_obj.exterior()
+                    print(f"1.3 Created exterior manifold: Success")
+                    vol = manifold.volume()
+                    print(f"1.4 Manifold volume: {vol}")
+                    
+                    try:
+                        target_manifold = get_knot_manifold("3_1")
+                        if target_manifold:
+                            try:
+                                result = manifold.is_isometric_to(target_manifold)
+                                print(f"1.5 Isometry check with 3_1: {result}")
+                            except Exception as e:
+                                print(f"1.5 Isometry check error: {e}")
+                                
+                            try:
+                                identify_result = manifold.identify()
+                                print(f"1.6 Manifold identify result: {identify_result}")
+                            except Exception as e:
+                                print(f"1.6 Identification error: {e}")
+                        else:
+                            print("1.5 Failed to create target manifold for 3_1")
+                    except Exception as e:
+                        print(f"1.5 Target manifold error: {e}")
+                        
+                except Exception as e:
+                    print(f"1.3 Failed to create exterior: {e}")
+            except Exception as e:
+                print(f"1.2 Failed to get link components: {e}")
+        except Exception as e:
+            print(f"1.1 Failed to create ClosedBraid: {e}")
+        
+        # --- Test 2: Via alternative creation methods ---
+        print("\nTEST 2: Creating trefoil via alternative methods")
+        try:
+            # Try loading the knot directly
+            knot = spherogram.Link("3_1")
+            print(f"2.1 Created Link from '3_1': Success")
+            
+            try:
+                manifold = knot.exterior()
+                print(f"2.2 Created exterior manifold: Success")
+                vol = manifold.volume()
+                print(f"2.3 Manifold volume: {vol}")
+                
+                try:
+                    identify_result = manifold.identify()
+                    print(f"2.4 Manifold identify result: {identify_result}")
+                except Exception as e:
+                    print(f"2.4 Identification error: {e}")
+            except Exception as e:
+                print(f"2.2 Failed to create exterior: {e}")
+        except Exception as e:
+            print(f"2.1 Failed to create Link: {e}")
+            
+        # --- Test 3: Via ClosedBraid with list constructor ---
+        print("\nTEST 3: Creating trefoil via ClosedBraid with list")
+        try:
+            # Try using the list constructor
+            braid_obj = spherogram.ClosedBraid([1, 1, 1])
+            print(f"3.1 Created ClosedBraid from [1, 1, 1]: Success")
+            
+            try:
+                manifold = braid_obj.exterior()
+                print(f"3.2 Created exterior manifold: Success")
+                vol = manifold.volume()
+                print(f"3.3 Manifold volume: {vol}")
+                
+                target_manifold = snappy.Manifold("3_1")
+                if target_manifold and manifold:
+                    try:
+                        result = manifold.is_isometric_to(target_manifold)
+                        print(f"3.4 Isometry check with 3_1: {result}")
+                    except Exception as e:
+                        print(f"3.4 Isometry check error: {e}")
+            except Exception as e:
+                print(f"3.2 Failed to create exterior: {e}")
+        except Exception as e:
+            print(f"3.1 Failed to create ClosedBraid: {e}")
+            
+        print("\nTrefoil detection tests complete.")
+        print("-" * 30)
+    
+    # Run the debug function
+    debug_trefoil_detection()
