@@ -81,4 +81,8 @@ python fermion.py
 ---
 Knot visuals generated using [KnotPlot](https://knotplot.com/).
 
+GPT-4o for original chat:
 https://chatgpt.com/share/6802c804-cb1c-8003-ba55-92068f6256b9
+
+Lord Kelvin for the vision which might very-well turn out to be the fundamental structure of reality:
+https://www.youtube.com/watch?v=8DBhTXM_Br4&ab_channel=Veritasium
