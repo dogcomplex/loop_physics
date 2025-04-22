@@ -6,6 +6,12 @@ In simple terms, this project explores the idea that the universe is like a fabr
 
 For a more detailed explanation using analogies, see [ELI5.md](ELI5.md).
 
+## Proposed Lepton Knots
+
+| Electron (3₁)                | Muon (5₁)                    | Tau (5₂)                     |
+| :--------------------------: | :--------------------------: | :--------------------------: |
+| ![Electron Knot](3_1_knot_electron.png) | ![Muon Knot](5_1_knot_muon.png) | ![Tau Knot](5_2_knot_tau.png) |
+
 This repository contains code and documentation related to the Loop-Spacetime Causality (LSC) framework, an exploratory model developed through AI-human collaboration investigating the emergence of fundamental particles and forces from quantum geometry, inspired by Loop Quantum Gravity (LQG).
 
 ## Overview
@@ -71,3 +77,5 @@ The `fermion.py` script has fewer dependencies (primarily `numpy`) and can be ru
 ```bash
 python fermion.py
 ```
+
+https://chatgpt.com/share/6802c804-cb1c-8003-ba55-92068f6256b9
