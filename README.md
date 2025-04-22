@@ -1,5 +1,11 @@
 # Loop-Spacetime Causality (LSC) Exploration
 
+## ELI5:
+
+In simple terms, this project explores the idea that the universe is like a fabric woven from tiny loops of spacetime. Particles like electrons aren't just sitting *on* this fabric, they *are* tiny, stable knots woven *into* it. Their mass comes from the energy of their quantum "jiggle," which is tiny because huge forces within the fabric almost perfectly cancel out, making the fabric very "flat" where the knot is. Different knots might explain different particles and their masses.
+
+For a more detailed explanation using analogies, see [ELI5.md](ELI5.md).
+
 This repository contains code and documentation related to the Loop-Spacetime Causality (LSC) framework, an exploratory model developed through AI-human collaboration investigating the emergence of fundamental particles and forces from quantum geometry, inspired by Loop Quantum Gravity (LQG).
 
 ## Overview
