@@ -1,4 +1,4 @@
-# --- LSC Stability Filter (v10 - Explicit Trefoil, Robust Search) ---
+# --- LSC Stability Filter (v12 - Hybrid Identification) ---
 # --- Searching for Candidate Topologies (Knots & Links) for Leptons ---
 
 import numpy as np
@@ -21,6 +21,15 @@ except ImportError as e:
     print("Note: SnapPy may require additional system dependencies.")
     sys.exit(1)
 except RuntimeError as e: print(f"Warning: Spherogram backend issue? {e}")
+
+# Check if running inside Sage (required for Jones polynomial)
+try:
+    import sage.all
+    print("INFO: Running inside SageMath environment.")
+    SAGE_AVAILABLE = True
+except ImportError:
+    print("WARNING: Not running inside SageMath. Jones polynomial calculation will fail.")
+    SAGE_AVAILABLE = False
 
 
 print("\n--- Loading LSC Deep Stability Filter ---")
@@ -68,6 +77,12 @@ TARGET_KNOTS_INFO = { # Prime knots up to 7 crossings
     "7_2": (7, 4), # (chiral)
 }
 MAX_CANDIDATE_CROSSINGS = 8 # Limit complexity of target knots
+
+# Define which knots are expected to be non-hyperbolic (volume ~ 0)
+# Torus knots (p,q) like 3_1 (3,2), 5_1 (5,2), 7_1 (7,2) are common examples
+NON_HYPERBOLIC_TARGETS = {"3_1", "5_1", "7_1"}
+HYPERBOLIC_TARGETS = {k for k in TARGET_KNOTS_INFO if k not in NON_HYPERBOLIC_TARGETS}
+VOLUME_THRESHOLD = 0.1 # Threshold to distinguish hyperbolic/non-hyperbolic
 
 # Known braid representations (as tuples) - INCLUDING 3_1
 KNOWN_BRAIDS = {
@@ -162,9 +177,36 @@ def generate_braid_words_optimized(n_strands, max_length, debug=False):
 class TimeoutException(Exception): pass
 def timeout_handler(signum, frame): print("\nERROR: Processing timed out!"); raise TimeoutException
 
+# --- Function to get Jones polynomial safely (Requires Sage) ---
+def get_jones_polynomial(link_obj, braid_tuple, error_state):
+    if not SAGE_AVAILABLE:
+        return None # Cannot calculate outside Sage
+    try:
+        poly = link_obj.jones_polynomial()
+        return poly # Return the raw Sage polynomial object
+    except spherogram.sage_helper.SageNotAvailable as e:
+        print(f"      ERROR: Sage not available for Jones polynomial: {e}")
+        return None
+    except AssertionError as e_assert:
+        # Print specific info for AssertionErrors, now using passed tuple
+        # Limit the number of times this is printed per run
+        if error_state['printed_count'] < error_state['max_prints']:
+             print(f"      ASSERTION ERROR calculating Jones polynomial for braid {braid_tuple}: {e_assert}")
+             error_state['printed_count'] += 1
+             if error_state['printed_count'] == error_state['max_prints'] and not error_state['suppressed_msg_shown']:
+                 print("      (Suppressing further polynomial assertion errors for this run)")
+                 error_state['suppressed_msg_shown'] = True
+        # Always return None on assertion error
+        return None # Treat assertion errors as calculation failure
+    except Exception as e:
+        # Handle potential errors during polynomial calculation
+        print(f"      ERROR calculating Jones polynomial: {e} (Type: {type(e)})")
+        return None
+
 # --- Main Filter Execution Function ---
 def find_simplest_braids(n_strands, max_braid_length, target_knots_info, time_limit_seconds):
     print(f"\n--- Running Search ({n_strands} STRANDS, MaxLen={max_braid_length}, Timeout={time_limit_seconds}s) ---")
+    print(f"--- Using HYBRID Identification (Manifold Vol > {VOLUME_THRESHOLD} ? SnapPy : Jones Poly) ---")
     has_signal = hasattr(signal, 'SIGALRM'); timer_set = False
     if has_signal:
         try: signal.signal(signal.SIGALRM, timeout_handler); signal.alarm(time_limit_seconds); timer_set = True
@@ -177,8 +219,11 @@ def find_simplest_braids(n_strands, max_braid_length, target_knots_info, time_li
     last_print_time = time.time()
     error_types = collections.Counter()
 
+    # State for managing assertion error printing
+    poly_assertion_state = {'printed_count': 0, 'max_prints': 5, 'suppressed_msg_shown': False}
+
     # Pre-load known braids for this strand count
-    print("Seeding with known braid representations...")
+    print("\nSeeding with known braid representations...")
     known_added_count = 0
     for name, b_tuple in KNOWN_BRAIDS.items():
         if name in target_knots_info:
@@ -190,18 +235,60 @@ def find_simplest_braids(n_strands, max_braid_length, target_knots_info, time_li
     print(f"Seeded {known_added_count} known braids for {n_strands} strands.")
     print("-------------------------------------------")
 
-    # Pre-build target manifolds for efficiency
-    target_manifolds = {name: get_knot_manifold(name) for name in target_knots_info}
-    target_manifolds = {name: mf for name, mf in target_manifolds.items() if mf is not None}
-    if not target_manifolds: print("ERROR: No target manifolds loaded. Cannot identify knots."); return {}
+    # --- Pre-calculate Target Manifolds (Hyperbolic) & Polynomials (Non-Hyperbolic) --- 
+    target_manifolds = {}
+    target_polynomials = {}
+    target_links = {} # Store Link objects for non-hyperbolic targets
+    manifold_errors = 0
+    poly_errors = 0
 
-    # Debug: Print loaded manifolds
-    print(f"Loaded {len(target_manifolds)} target manifolds: {', '.join(target_manifolds.keys())}")
+    print("\nPre-calculating for HYPERBOLIC targets (Manifolds)...")
+    for name in HYPERBOLIC_TARGETS:
+        if name in target_knots_info:
+            mf = get_knot_manifold(name)
+            if mf is not None:
+                target_manifolds[name] = mf
+            else:
+                print(f"  WARNING: Failed to get manifold for hyperbolic target {name}.")
+                manifold_errors += 1
+    print(f"Pre-calculated {len(target_manifolds)} manifolds for {len(HYPERBOLIC_TARGETS)} hyperbolic targets.")
+
+    print("\nPre-calculating for NON-HYPERBOLIC targets (Jones Polynomials)...")
+    if not SAGE_AVAILABLE:
+        print("  SKIPPING polynomial calculation: Not running in Sage.")
+    else:
+        # Need dummy braid tuple for pre-calculation call (not used in print on success)
+        dummy_tuple = ('target',) 
+        for name in NON_HYPERBOLIC_TARGETS:
+            if name in target_knots_info:
+                try:
+                    link = spherogram.Link(name)
+                    target_links[name] = link # Store link for mirror check later
+                    poly = get_jones_polynomial(link, dummy_tuple, poly_assertion_state) # Pass state
+                    if poly is not None:
+                        target_polynomials[name] = poly
+                        # print(f"  {name}: {poly}") # Optional debug print
+                    else:
+                        print(f"  WARNING: Failed to calculate Jones polynomial for non-hyperbolic target {name}.")
+                        poly_errors += 1
+                except Exception as e:
+                    print(f"  ERROR: Failed to create Link object for non-hyperbolic target {name}: {e}")
+                    poly_errors += 1
+        print(f"Pre-calculated {len(target_polynomials)} polynomials for {len(NON_HYPERBOLIC_TARGETS)} non-hyperbolic targets.")
+
+    if manifold_errors > 0:
+        print(f"WARNING: Encountered {manifold_errors} errors during target manifold calculation.")
+    if poly_errors > 0:
+        print(f"WARNING: Encountered {poly_errors} errors during target polynomial calculation.")
+    if not target_manifolds and not target_polynomials:
+        print("ERROR: No target manifolds or polynomials loaded/calculated. Cannot identify knots.")
+        return {}
+    print("-------------------------------------------")
 
     # Enable debug tracking for 2-strand braids to identify trefoil issues
     enable_debug = (n_strands == 2)
     braid_generator = generate_braid_words_optimized(n_strands, max_braid_length, debug=enable_debug)
-    print("\nFiltering generated braids...")
+    print("\nFiltering generated braids using Hybrid Method...")
 
     # Add specific trefoil debug for 2-strand case
     if n_strands == 2:
@@ -223,13 +310,17 @@ def find_simplest_braids(n_strands, max_braid_length, target_knots_info, time_li
                 # Special debugging for trefoil braid
                 is_trefoil_braid = (braid_tuple == (1, 1, 1))
                 if is_trefoil_braid and n_strands == 2:
-                    print(f"\nDEBUG: PROCESSING TREFOIL BRAID {braid_tuple}")
-                
+                    # Keep this debug print if helpful for generation tracking
+                    print(f"\nDEBUG: GENERATED/PROCESSING TREFOIL BRAID {braid_tuple}")
+
                 # Optimization: Check if this braid is longer than shortest found for all targets
-                if len(best_braid_repr) == len(target_knots_info) and \
-                   all(data['length'] <= len(braid_tuple) for data in best_braid_repr.values()):
+                # Needs to check against combined targets
+                all_target_names = HYPERBOLIC_TARGETS.union(NON_HYPERBOLIC_TARGETS)
+                if len(best_braid_repr) == len(all_target_names) and \
+                   all(data['length'] <= len(braid_tuple) for name, data in best_braid_repr.items() if name in all_target_names):
                     if is_trefoil_braid and n_strands == 2:
-                        print("DEBUG: Would normally skip trefoil, but processing anyway for debugging")
+                        # Keep this debug print if helpful for generation tracking
+                        print(f"\nDEBUG: GENERATED/PROCESSING TREFOIL BRAID {braid_tuple}")
                     else:
                         continue # Skip if cannot improve any result
 
@@ -269,23 +360,12 @@ def find_simplest_braids(n_strands, max_braid_length, target_knots_info, time_li
                     if count_processed <= 5: print(f"ERROR on Braid creation: {e} for braid {braid_tuple}")
                     continue
 
-                # SPECIAL CASE: Direct detection for trefoil (3_1)
-                # Handle non-hyperbolic knots that SnapPy struggles with
-                if braid_tuple == (1, 1, 1):
-                    # The trefoil is a special case - directly assign it
-                    if "3_1" in target_knots_info and (
-                        "3_1" not in best_braid_repr or len(braid_tuple) < best_braid_repr["3_1"]['length']):
-                        best_braid_repr["3_1"] = {
-                            'braid_tuple': braid_tuple,
-                            'length': len(braid_tuple),
-                            'source': 'search'
-                        }
-                        print(f"  ** Found 3_1 (special case): Length={len(braid_tuple)} (Braid: s1 s1 s1) **")
-                        count_candidates_found += 1
-                        continue  # Skip to next braid
+                # REMOVED SPECIAL CASE for trefoil (1, 1, 1) - rely on hybrid method now
+                # if braid_tuple == (1, 1, 1):
+                #     ... removed ...
 
                 try:
-                    link_obj = braid_obj  # ClosedBraid is already a Link object, no closing needed
+                    link_obj = braid_obj  # ClosedBraid is already a Link object
                 except Exception as e:
                     error_types['braid_closing'] += 1
                     errors_encountered += 1
@@ -318,44 +398,117 @@ def find_simplest_braids(n_strands, max_braid_length, target_knots_info, time_li
                 # Optional Faster Check: if manifold.volume() < 0.1: continue
 
                 found_match_this_braid = False
-                for knot_name, target_manifold in target_manifolds.items():
-                    current_length = len(braid_tuple)
-                    # Check if it's a target and if we found a shorter rep
-                    if knot_name in target_knots_info and \
-                       (knot_name not in best_braid_repr or current_length < best_braid_repr[knot_name]['length']):
-                        try:
-                            # Special debug for trefoil braid
-                            is_trefoil_iso_debug = is_trefoil_braid and n_strands == 2 and knot_name == "3_1"
-                            if is_trefoil_iso_debug:
-                                print(f"DEBUG: Checking trefoil isometry against {knot_name}")
-                                
-                            if target_manifold and manifold.is_isometric_to(target_manifold):
-                                # Found a match for this target knot!
-                                best_braid_repr[knot_name] = {
-                                    'braid_tuple': braid_tuple,
-                                    'length': current_length,
-                                    'source': 'search'
-                                }
-                                count_candidates_found += 1
-                                print(f"  ** Found {knot_name}: New Shortest Length={current_length} (Braid: {format_braid_word(braid_tuple)}) **")
-                                found_match_this_braid = True
-                                # Don't break, could match multiple targets (unlikely for knots)
-                        except Exception as e_iso: 
-                            # Many errors are expected for non-matching manifolds
-                            error_message = str(e_iso)
-                            error_types['isometry_check'] += 1
+                current_length = len(braid_tuple)
+
+                # --- Hybrid Identification --- 
+                manifold = None
+                volume = -1.0 # Default to invalid volume
+                try:
+                    # Still need the manifold for volume check
+                    manifold = link_obj.exterior()
+                    # Calculate volume here (might raise error for some links)
+                    volume = manifold.volume()
+                except Exception as e:
+                    # Errors can happen here for complex/degenerate links
+                    error_types['exterior_vol_error'] += 1
+                    errors_encountered += 1
+                    # Don't print every time, can be noisy
+                    # if count_processed <= 10 or errors_encountered % 100 == 0:
+                    #    print(f"Warning: Exterior/Volume calculation failed: {e}")
+                    continue # Cannot identify if exterior/volume fails
+
+                # --- Branch based on Volume --- 
+                if volume > VOLUME_THRESHOLD:
+                    # --- Hyperbolic Path: Use Snappy Isometry --- 
+                    identification_method = "Isometry" 
+                    if not target_manifolds:
+                         # error_types['no_hyperbolic_targets'] += 1 # Redundant?
+                         pass # No hyperbolic targets to check against
+                    else:
+                        for knot_name, target_manifold in target_manifolds.items():
+                            # Check if it's a potential target and shorter rep needed
+                            if knot_name in target_knots_info and \
+                               (knot_name not in best_braid_repr or current_length < best_braid_repr[knot_name]['length']):
+                                try:
+                                    if manifold.is_isometric_to(target_manifold):
+                                        # Found a match!
+                                        best_braid_repr[knot_name] = {
+                                            'braid_tuple': braid_tuple,
+                                            'length': current_length,
+                                            'source': 'search_iso'
+                                        }
+                                        count_candidates_found += 1
+                                        print(f"  ** Found HYPERBOLIC {knot_name}: L={current_length} (Braid: {format_braid_word(braid_tuple)}) **")
+                                        found_match_this_braid = True
+                                        # Don't break, continue checking (unlikely match multiple)
+                                except Exception as e_iso:
+                                    # Expected errors for non-matching manifolds
+                                    error_types['isometry_check'] += 1
+                                    # Suppress common error message (already printed at start)
+                                    common_error = "The SnapPea kernel was not able to determine if the manifolds are isometric."
+                                    if str(e_iso) != common_error:
+                                         errors_encountered += 1 # Only count uncommon errors?
+                                         print(f"UNCOMMON ISOMETRY ERROR for {knot_name}: {e_iso}")
+                                    pass # Continue checking other hyperbolic targets
+                
+                else: # Volume <= VOLUME_THRESHOLD
+                    # --- Non-Hyperbolic Path: Use Jones Polynomial (if Sage available) --- 
+                    identification_method = "Polynomial"
+                    if not SAGE_AVAILABLE or not target_polynomials:
+                        error_types['poly_check_skipped'] += 1
+                        pass # Cannot check or no non-hyperbolic targets
+                    else:
+                        # Calculate polynomial for the candidate braid
+                        candidate_poly = get_jones_polynomial(link_obj, braid_tuple, poly_assertion_state) # Pass state
+                        if candidate_poly is None:
+                            # Error counter is incremented based on where None comes from
+                            # If it was assertion error, get_jones_poly handles print limit
+                            error_types['poly_calc_failed'] += 1 # Generic failure count
                             errors_encountered += 1
-                            
-                            # Only print errors for the first few braids or rare error types
-                            common_error = "The SnapPea kernel was not able to determine if the manifolds are isometric."
-                            if count_processed <= 5 and error_message == common_error:
-                                # Print just once for common errors during initial processing
-                                if error_types['isometry_check'] == 1:
-                                    print(f"INFO: Suppressing common expected error: '{common_error}'")
-                            elif error_message != common_error:
-                                # Always print uncommon errors, they might be important
-                                print(f"UNCOMMON ERROR: {error_message}")
-                            pass
+                            # if count_processed <= 10: print(f"Failed poly calc for braid: {braid_tuple}")
+                            continue # Cannot compare if calculation failed
+
+                        for knot_name, target_poly in target_polynomials.items():
+                            # Check if it's a potential target and shorter rep needed
+                            if knot_name in target_knots_info and \
+                               (knot_name not in best_braid_repr or current_length < best_braid_repr[knot_name]['length']):
+                                try:
+                                    # Compare candidate polynomial with target
+                                    is_match = (candidate_poly == target_poly)
+                                    
+                                    # Also check mirror image if direct match fails
+                                    mirror_poly = None
+                                    if not is_match:
+                                        target_link = target_links.get(knot_name)
+                                        if target_link:
+                                            try:
+                                                mirror_link = target_link.mirror()
+                                                # Pass dummy tuple for mirror pre-calc check
+                                                mirror_poly = get_jones_polynomial(mirror_link, dummy_tuple, poly_assertion_state) # Pass state
+                                                if mirror_poly is not None:
+                                                    is_match = (candidate_poly == mirror_poly)
+                                                    # if is_match: print(f"  (Identified mirror image of {knot_name})")
+                                            except Exception:
+                                                error_types['mirror_poly_calc_failed'] += 1
+                                                # Continue without mirror check if it fails
+
+                                    if is_match:
+                                        # Found a match!
+                                        best_braid_repr[knot_name] = {
+                                            'braid_tuple': braid_tuple,
+                                            'length': current_length,
+                                            'source': 'search_poly' + ('_mirror' if candidate_poly == mirror_poly else '')
+                                        }
+                                        count_candidates_found += 1
+                                        print(f"  ** Found NON-HYPERBOLIC {knot_name}: L={current_length} (Braid: {format_braid_word(braid_tuple)}) **")
+                                        found_match_this_braid = True
+                                        # Don't break, continue checking (unlikely match multiple)
+
+                                except Exception as e_poly_comp:
+                                    error_types['poly_comparison_error'] += 1
+                                    errors_encountered += 1
+                                    print(f"ERROR during poly comparison for {knot_name}: {e_poly_comp}")
+                                    pass # Continue checking other non-hyperbolic targets
 
             except ValueError as e: 
                 error_types['value_error'] += 1
@@ -470,106 +623,95 @@ if __name__ == "__main__":
 
     # --- Debug Trefoil Detection ---
     print("\n" + "="*40)
-    print("--- DEBUGGING TREFOIL DETECTION ---")
+    print("--- DEBUGGING TREFOIL DETECTION (Hybrid Method) ---")
     
-    def debug_trefoil_detection():
-        print("Testing explicit trefoil braid recognition:")
+    def debug_trefoil_detection(error_state):
+        print("Testing explicit trefoil (3_1) recognition:")
         print("-" * 30)
-        
-        # --- Test 1: Via direct braid-tuple construction ---
-        print("\nTEST 1: Creating trefoil via direct braid tuple")
+        knot_name = "3_1"
         trefoil_braid = (1, 1, 1)
-        
+        volume = -1
+        manifold = None
+        poly = None
+
+        print("Attempting Manifold/Volume/Isometry...")
         try:
             braid_obj = spherogram.ClosedBraid(*trefoil_braid)
-            print(f"1.1 Created ClosedBraid from {trefoil_braid}: Success")
-            
-            try:
-                components = braid_obj.link_components
-                print(f"1.2 Number of link components: {len(components)}")
-                
-                try:
-                    manifold = braid_obj.exterior()
-                    print(f"1.3 Created exterior manifold: Success")
-                    vol = manifold.volume()
-                    print(f"1.4 Manifold volume: {vol}")
-                    
-                    try:
-                        target_manifold = get_knot_manifold("3_1")
-                        if target_manifold:
-                            try:
-                                result = manifold.is_isometric_to(target_manifold)
-                                print(f"1.5 Isometry check with 3_1: {result}")
-                            except Exception as e:
-                                print(f"1.5 Isometry check error: {e}")
-                                
-                            try:
-                                identify_result = manifold.identify()
-                                print(f"1.6 Manifold identify result: {identify_result}")
-                            except Exception as e:
-                                print(f"1.6 Identification error: {e}")
-                        else:
-                            print("1.5 Failed to create target manifold for 3_1")
-                    except Exception as e:
-                        print(f"1.5 Target manifold error: {e}")
-                        
-                except Exception as e:
-                    print(f"1.3 Failed to create exterior: {e}")
-            except Exception as e:
-                print(f"1.2 Failed to get link components: {e}")
-        except Exception as e:
-            print(f"1.1 Failed to create ClosedBraid: {e}")
-        
-        # --- Test 2: Via alternative creation methods ---
-        print("\nTEST 2: Creating trefoil via alternative methods")
-        try:
-            # Try loading the knot directly
-            knot = spherogram.Link("3_1")
-            print(f"2.1 Created Link from '3_1': Success")
-            
-            try:
-                manifold = knot.exterior()
-                print(f"2.2 Created exterior manifold: Success")
-                vol = manifold.volume()
-                print(f"2.3 Manifold volume: {vol}")
-                
-                try:
-                    identify_result = manifold.identify()
-                    print(f"2.4 Manifold identify result: {identify_result}")
-                except Exception as e:
-                    print(f"2.4 Identification error: {e}")
-            except Exception as e:
-                print(f"2.2 Failed to create exterior: {e}")
-        except Exception as e:
-            print(f"2.1 Failed to create Link: {e}")
-            
-        # --- Test 3: Via ClosedBraid with list constructor ---
-        print("\nTEST 3: Creating trefoil via ClosedBraid with list")
-        try:
-            # Try using the list constructor
-            braid_obj = spherogram.ClosedBraid([1, 1, 1])
-            print(f"3.1 Created ClosedBraid from [1, 1, 1]: Success")
-            
-            try:
-                manifold = braid_obj.exterior()
-                print(f"3.2 Created exterior manifold: Success")
-                vol = manifold.volume()
-                print(f"3.3 Manifold volume: {vol}")
-                
-                target_manifold = snappy.Manifold("3_1")
-                if target_manifold and manifold:
+            manifold = braid_obj.exterior()
+            volume = manifold.volume()
+            print(f"  Volume: {volume}")
+            if volume > VOLUME_THRESHOLD:
+                print("  Volume > threshold, attempting isometry check (EXPECTING FAILURE or ERROR)...")
+                target_manifold = get_knot_manifold(knot_name)
+                if target_manifold:
                     try:
                         result = manifold.is_isometric_to(target_manifold)
-                        print(f"3.4 Isometry check with 3_1: {result}")
+                        print(f"  Isometry check result: {result} (UNEXPECTED if True)")
                     except Exception as e:
-                        print(f"3.4 Isometry check error: {e}")
-            except Exception as e:
-                print(f"3.2 Failed to create exterior: {e}")
+                        print(f"  Isometry check expected error: {e}")
+                else:
+                    print("  Could not get target manifold for isometry check.")
+            else:
+                print(f"  Volume <= threshold ({VOLUME_THRESHOLD}), skipping isometry check (correct path).")
         except Exception as e:
-            print(f"3.1 Failed to create ClosedBraid: {e}")
-            
-        print("\nTrefoil detection tests complete.")
+            print(f"  Error during manifold/volume processing: {e}")
+        
+        print("\nAttempting Polynomial Comparison (requires Sage)... ")
+        if not SAGE_AVAILABLE:
+             print("  SKIPPING: Not running in Sage.")
+        else:
+            # Need dummy tuple for calls inside debug
+            dummy_tuple = ('target',) 
+            braid_obj = None # Ensure braid_obj is defined before try
+            try:
+                 braid_obj = spherogram.ClosedBraid(*trefoil_braid)
+            except Exception as e:
+                print(f"  Error creating braid object for poly test: {e}")
+
+            try:
+                # Get target polynomial
+                target_poly = None
+                target_link = None
+                try:
+                    target_link = spherogram.Link(knot_name)
+                    target_poly = get_jones_polynomial(target_link, dummy_tuple, error_state)
+                    if target_poly:
+                         print(f"  Target Polynomial (3_1): {target_poly}")
+                    else:
+                         print("  Failed to get target polynomial for 3_1.")
+                except Exception as e:
+                    print(f"  Error getting target link/poly: {e}")
+
+                # Get polynomial from braid
+                if braid_obj and target_poly:
+                    candidate_poly = get_jones_polynomial(braid_obj, trefoil_braid, error_state)
+                    if candidate_poly:
+                        print(f"  Candidate Polynomial ({trefoil_braid}): {candidate_poly}")
+                        match = (candidate_poly == target_poly)
+                        print(f"  Polynomials match: {match} (EXPECTING TRUE)")
+
+                        # Check mirror
+                        if not match:
+                            print("  Checking mirror polynomial...")
+                            mirror_poly = None
+                            try:
+                                mirror_link = target_link.mirror()
+                                mirror_poly = get_jones_polynomial(mirror_link, dummy_tuple, error_state)
+                                if mirror_poly:
+                                     mirror_match = (candidate_poly == mirror_poly)
+                                     print(f"  Mirror Polynomial (3_1_mirror): {mirror_poly}")
+                                     print(f"  Candidate matches mirror: {mirror_match}")
+                            except Exception as e_mirror:
+                                print(f"  Error getting mirror poly: {e_mirror}")
+                    else:
+                         print("  Failed to calculate candidate polynomial from braid (1,1,1)." )
+            except Exception as e:
+                print(f"  Error during polynomial processing: {e}")
+
+        print("\nTrefoil hybrid detection tests complete.")
         print("-" * 30)
     
     # Run the debug function
-    debug_trefoil_detection()
+    # Define a state dictionary for the debug function's calls
+    debug_poly_assertion_state = {'printed_count': 0, 'max_prints': 5, 'suppressed_msg_shown': False}
+    debug_trefoil_detection(debug_poly_assertion_state) # Pass the state
