@@ -1,4 +1,4 @@
-# --- LSC Stability Filter (v13 - Hybrid ID + Invariant Correlation) ---
+# --- LSC Stability Filter (v13 -> v14: Hybrid ID + Log Jones Correlation) ---
 # --- Searching for Candidate Topologies & Correlating Invariants ---
 
 import numpy as np
@@ -22,10 +22,14 @@ try:
     print("INFO: Running inside SageMath environment.")
     SAGE_AVAILABLE = True
     # Define polynomial variables for Sage (used in calculate_invariants)
-    R = sage.all.LaurentPolynomialRing(sage.all.QQ, 'q')
-    q = R.gen()
+    # Use q_var to avoid conflict with q as loop/value variable
+    R = sage.all.LaurentPolynomialRing(sage.all.QQ, 'q_var')
+    q_var = R.gen()
     T = sage.all.PolynomialRing(sage.all.ZZ, 't')
     t = T.gen()
+    # Define roots of unity
+    omega3 = sage.all.exp(2 * sage.all.pi * sage.all.I / 3)
+    omega5 = sage.all.exp(2 * sage.all.pi * sage.all.I / 5)
 except ImportError:
     # Distinguish between missing Sage and other import errors
     try:
@@ -44,6 +48,7 @@ except Exception as e:
 
 
 print("\n--- Loading LSC Hybrid Search & Invariant Correlator ---")
+print("--- v14: Added test for hypothesis: c1 ~ -log |Jones(K; q)| ---")
 
 # --- Constants & Targets ---
 alpha_fine_structure = 1 / 137.035999
@@ -199,8 +204,8 @@ def get_jones_polynomial(link_obj, braid_tuple, error_state):
     if not SAGE_AVAILABLE:
         return None # Cannot calculate outside Sage
     try:
-        # Use the Sage polynomial variable 'q' defined globally
-        poly = link_obj.jones_polynomial(variable=q)
+        # Use the Sage polynomial variable 'q_var' defined globally
+        poly = link_obj.jones_polynomial(variable=q_var)
         return poly # Return the raw Sage polynomial object
     except spherogram.sage_helper.SageNotAvailable as e:
         print(f"      ERROR: Sage not available for Jones polynomial: {e}")
@@ -616,7 +621,7 @@ def debug_trefoil_detection(error_state):
     print("-" * 30)
 
 
-# --- Invariant Calculation Function (Cleaned) ---
+# --- Invariant Calculation Function (Cleaned & Enhanced for Log|J(q)|) ---
 def calculate_invariants(knot_name):
     """Calculate key invariants for a given knot using Spherogram."""
     print(f"Calculating invariants for {knot_name}...")
@@ -624,8 +629,11 @@ def calculate_invariants(knot_name):
     data = {'name': knot_name, 'Nc': TARGET_KNOTS_INFO.get(knot_name, (None,None))[0], # Get Nc from dict
             'signature': None, 'determinant': None,
             # 'arf': None, # Removed - not available directly
-            'jones_at_5th_root': None, 'alexander_at_minus1': None,
+            'jones_at_5th_root': None, # Keep this |J(ω5)| for comparison
+            'alexander_at_minus1': None,
             'alexander_at_minus2': None,
+            'log_abs_jones_w3': None, # NEW: log |J(ω3)|
+            'log_abs_jones_w5': None, # NEW: log |J(ω5)|
             # 'is_chiral': None # Removed - not available directly
            }
     link = None # Define link outside try block
@@ -653,12 +661,24 @@ def calculate_invariants(knot_name):
         # --- Polynomial Calculations ---
         if SAGE_AVAILABLE:
             try:
-                # Jones polynomial at q = exp(2*pi*i / 5) - requires Sage
-                jones_poly_q = link.jones_polynomial(variable=q)
-                fifth_root = sage.all.exp(2 * sage.all.pi * sage.all.I / 5)
-                jones_eval = jones_poly_q(fifth_root) # Evaluate polynomial directly
-                jones_numeric = abs(jones_eval) if hasattr(jones_eval,'abs') else jones_eval
-                data['jones_at_5th_root'] = float(jones_numeric) # Ensure float conversion
+                # Jones polynomial calculation (raw polynomial)
+                jones_poly_q = link.jones_polynomial(variable=q_var) # Use q_var
+
+                # Evaluate at omega5 = exp(2*pi*i / 5)
+                jones_eval_w5 = jones_poly_q(omega5)
+                jones_abs_w5 = abs(jones_eval_w5) if hasattr(jones_eval_w5,'abs') else jones_eval_w5
+                data['jones_at_5th_root'] = float(jones_abs_w5) # Keep original |J(ω5)|
+                if jones_abs_w5 > 1e-9: # Avoid log(0)
+                    data['log_abs_jones_w5'] = float(np.log(jones_abs_w5))
+                else: print(f"  Warn: |J(ω5)| is near zero for {knot_name}")
+
+                # Evaluate at omega3 = exp(2*pi*i/3)
+                jones_eval_w3 = jones_poly_q(omega3)
+                jones_abs_w3 = abs(jones_eval_w3) if hasattr(jones_eval_w3,'abs') else jones_eval_w3
+                if jones_abs_w3 > 1e-9: # Avoid log(0)
+                    data['log_abs_jones_w3'] = float(np.log(jones_abs_w3))
+                else: print(f"  Warn: |J(ω3)| is near zero for {knot_name}")
+
             except Exception as e_jones:
                  print(f"  Warning: Jones calculation failed for {knot_name}: {e_jones}")
 
@@ -683,9 +703,11 @@ def calculate_invariants(knot_name):
     j5_str = f"{data['jones_at_5th_root']:.3f}" if data['jones_at_5th_root'] is not None else "N/A"
     a1_str = f"{data['alexander_at_minus1']}" if data['alexander_at_minus1'] is not None else "N/A" # Integer usually
     a2_str = f"{data['alexander_at_minus2']}" if data['alexander_at_minus2'] is not None else "N/A" # Integer usually
+    ljw3_str = f"{data['log_abs_jones_w3']:.3f}" if data['log_abs_jones_w3'] is not None else "N/A"
+    ljw5_str = f"{data['log_abs_jones_w5']:.3f}" if data['log_abs_jones_w5'] is not None else "N/A"
 
-    # Updated print string to exclude removed invariants
-    print(f"  -> Nc={data['Nc']}, Sig={data['signature']}, Det={data['determinant']}, J(ω5)={j5_str}, Δ(-1)={a1_str}, Δ(-2)={a2_str}")
+    # Updated print string to include log|J(q)| values
+    print(f"  -> Nc={data['Nc']}, Sig={data['signature']}, Det={data['determinant']}, |J(ω5)|={j5_str}, Δ(-1)={a1_str}, Δ(-2)={a2_str}, log|J(ω3)|={ljw3_str}, log|J(ω5)|={ljw5_str}")
     return data
 
 
@@ -778,77 +800,165 @@ if __name__ == "__main__":
 
     # --- Correlation Search Phase ---
     print("\n" + "="*20 + " PHASE 4: CORRELATION SEARCH " + "="*20)
-    # Define C1 required based on a *FIXED HYPOTHETICAL* assignment for correlation test
-    C1_REQUIRED_FOR_FIT = {
+
+    # --- Subsection 4.1: Fit based on FIXED Hypothesis (3_1, 5_1, 5_2) ---
+    print("\n--- 4.1: Correlation Test (Fixed Hypothesis: 3_1(e), 5_1(mu), 5_2(tau)) ---")
+    C1_REQUIRED_FOR_FIXED_FIT = {
         "3_1": C1_REQUIRED_TARGETS.get("electron"),
         "5_1": C1_REQUIRED_TARGETS.get("muon"),
         "5_2": C1_REQUIRED_TARGETS.get("tau"),
     }
-    C1_REQUIRED_FOR_FIT = {k: v for k, v in C1_REQUIRED_FOR_FIT.items() if v is not None}
+    C1_REQUIRED_FOR_FIXED_FIT = {k: v for k, v in C1_REQUIRED_FOR_FIXED_FIT.items() if v is not None}
 
-    print("Testing Correlation Hypothesis: c1(3_1)≈e, c1(5_1)≈μ, c1(5_2)≈τ")
-    # Extract relevant data for the specific knots in the hypothesis
-    leptons_for_fit = ["3_1", "5_1", "5_2"]
-    fit_data_points = {name: knot_invariant_data.get(name) for name in leptons_for_fit}
+    # print(f"Testing Correlation Hypothesis: c1(3_1)≈e, c1(5_1)≈μ, c1(5_2)≈τ") # Redundant with section title
+    leptons_for_fixed_fit = ["3_1", "5_1", "5_2"]
+    fit_data_points_fixed = {name: knot_invariant_data.get(name) for name in leptons_for_fixed_fit}
 
-    # Check if all required knot data is present
-    if any(data is None for data in fit_data_points.values()) or len(C1_REQUIRED_FOR_FIT) != 3 :
-        print("ERROR: Missing invariant data or c1 targets for knots in the fixed assignment (3_1, 5_1, 5_2). Cannot perform fit.")
-        fit_attempted = False # Flag to track if fit was attempted
+    # Check if all required knot data is present for fixed fit
+    if any(data is None for data in fit_data_points_fixed.values()) or len(C1_REQUIRED_FOR_FIXED_FIT) != 3 :
+        print("ERROR: Missing invariant data or c1 targets for knots in the fixed assignment (3_1, 5_1, 5_2). Cannot perform fixed fit.")
+        fixed_fit_attempted = False # Flag to track if fit was attempted
+        c1_pred_sig = c1_pred_jones = None # Ensure variables are defined
     else:
-        fit_attempted = True # Flag to track if fit was attempted
-        target_c1_values_for_fit = [C1_REQUIRED_FOR_FIT[name] for name in leptons_for_fit]
+        fixed_fit_attempted = True # Flag to track if fit was attempted
+        target_c1_values_fixed = [C1_REQUIRED_FOR_FIXED_FIT[name] for name in leptons_for_fixed_fit]
+        target_c1_array_fixed = np.array(target_c1_values_fixed)
 
-        # Remove Nc fit attempt
-        print("\nAttempting simple correlation fits (Example: c1 = A / Nc + B):")
+        # --- Original Fits (Nc skipped, Signature, |J(ω5)|) ---
+        print("\nAttempting fits using fixed hypothesis (3_1, 5_1, 5_2):")
         print("  Skipping Nc fit: Nc not available from invariant calculation.")
-        # x_nc = np.array([fit_data_points[name]['Nc'] for name in leptons_for_fit if fit_data_points[name]['Nc'] is not None])
-        # ... (rest of Nc fit code removed) ...
 
-        print("\nAttempting simple correlation fits (Example: c1 = A * |Signature| + B):")
-        x_sig = np.array([abs(fit_data_points[name]['signature']) for name in leptons_for_fit if fit_data_points[name]['signature'] is not None])
-        y_c1 = np.array([c1 for name, c1 in zip(leptons_for_fit, target_c1_values_for_fit) if fit_data_points[name]['signature'] is not None])
-        if len(x_sig) == 3:
+        # Fit vs |Signature|
+        x_sig_fixed = np.array([abs(fit_data_points_fixed[name]['signature']) for name in leptons_for_fixed_fit if fit_data_points_fixed[name]['signature'] is not None])
+        y_c1_fixed_sig = np.array([c1 for name, c1 in zip(leptons_for_fixed_fit, target_c1_values_fixed) if fit_data_points_fixed[name]['signature'] is not None])
+        if len(x_sig_fixed) == 3:
             try:
-                coeffs_sig = np.polyfit(x_sig, y_c1, 1)
+                coeffs_sig = np.polyfit(x_sig_fixed, y_c1_fixed_sig, 1)
                 A_sig, B_sig = coeffs_sig[0], coeffs_sig[1]
                 print(f"  Fit c1 ≈ {A_sig:.3f} * |Signature| + {B_sig:.3f}")
-                c1_pred_sig = A_sig * x_sig + B_sig
-                print(f"    Predictions: {leptons_for_fit[0]}={c1_pred_sig[0]:.3f}, {leptons_for_fit[1]}={c1_pred_sig[1]:.3f}, {leptons_for_fit[2]}={c1_pred_sig[2]:.3f}")
-            except Exception as e: print(f"  Fit failed for Signature: {e}")
-        else: print("  Skipping Signature fit: Incomplete data.")
+                c1_pred_sig = A_sig * x_sig_fixed + B_sig # Assign prediction for later status printout
+                print(f"    Predictions: {leptons_for_fixed_fit[0]}={c1_pred_sig[0]:.3f}, {leptons_for_fixed_fit[1]}={c1_pred_sig[1]:.3f}, {leptons_for_fixed_fit[2]}={c1_pred_sig[2]:.3f}")
+            except Exception as e: print(f"  Fit failed for Signature: {e}"); c1_pred_sig = None
+        else: print("  Skipping Signature fit: Incomplete data."); c1_pred_sig = None
 
-        print("\nAttempting simple correlation fits (Example: c1 = A / Jones(ω5) + B):")
-        x_jones = np.array([fit_data_points[name]['jones_at_5th_root'] for name in leptons_for_fit if fit_data_points[name]['jones_at_5th_root'] is not None])
-        y_c1 = np.array([c1 for name, c1 in zip(leptons_for_fit, target_c1_values_for_fit) if fit_data_points[name]['jones_at_5th_root'] is not None])
-        if len(x_jones) == 3:
+        # Fit vs 1 / |J(ω5)|
+        x_jones_fixed = np.array([fit_data_points_fixed[name]['jones_at_5th_root'] for name in leptons_for_fixed_fit if fit_data_points_fixed[name]['jones_at_5th_root'] is not None])
+        y_c1_fixed_jones = np.array([c1 for name, c1 in zip(leptons_for_fixed_fit, target_c1_values_fixed) if fit_data_points_fixed[name]['jones_at_5th_root'] is not None])
+        if len(x_jones_fixed) == 3:
             try:
-                # Avoid division by zero if Jones(ω5) is zero or very small
-                if np.any(np.abs(x_jones) < 1e-9):
+                if np.any(np.abs(x_jones_fixed) < 1e-9):
                      print("  Skipping Jones(ω5) fit: Value too close to zero.")
+                     c1_pred_jones = None
                 else:
-                    inv_x_jones = 1.0 / x_jones
-                    coeffs_jones = np.polyfit(inv_x_jones, y_c1, 1)
+                    inv_x_jones_fixed = 1.0 / x_jones_fixed
+                    coeffs_jones = np.polyfit(inv_x_jones_fixed, y_c1_fixed_jones, 1)
                     A_jones, B_jones = coeffs_jones[0], coeffs_jones[1]
-                    print(f"  Fit c1 ≈ {A_jones:.3f} / Jones(ω5) + {B_jones:.3f}")
-                    c1_pred_jones = A_jones / x_jones + B_jones
-                    print(f"    Predictions: {leptons_for_fit[0]}={c1_pred_jones[0]:.3f}, {leptons_for_fit[1]}={c1_pred_jones[1]:.3f}, {leptons_for_fit[2]}={c1_pred_jones[2]:.3f}")
-            except Exception as e: print(f"  Fit failed for Jones(ω5): {e}")
-        else: print("  Skipping Jones(ω5) fit: Incomplete data.")
+                    print(f"  Fit c1 ≈ {A_jones:.3f} / |J(ω5)| + {B_jones:.3f}")
+                    c1_pred_jones = A_jones / x_jones_fixed + B_jones # Assign prediction
+                    print(f"    Predictions: {leptons_for_fixed_fit[0]}={c1_pred_jones[0]:.3f}, {leptons_for_fixed_fit[1]}={c1_pred_jones[1]:.3f}, {leptons_for_fixed_fit[2]}={c1_pred_jones[2]:.3f}")
+            except Exception as e: print(f"  Fit failed for Jones(ω5): {e}"); c1_pred_jones = None
+        else: print("  Skipping Jones(ω5) fit: Incomplete data."); c1_pred_jones = None
 
+    # --- Subsection 4.2: Fit c1 ~ -log|J(q)| based on DYNAMIC Assignment ---
+    print("\n--- 4.2: Correlation Test (Dynamic Assignment vs -log|J(q)|) ---")
+    # Use knots assigned in Phase 2: final_assigned_knots dictionary
+    assigned_leptons = list(final_assigned_knots.keys()) # e.g., ['electron', 'muon', 'tau']
+    assigned_knot_names = list(final_assigned_knots.values()) # e.g., ['3_1', '5_1', '5_2']
+
+    log_fit_data_valid = True
+    target_c1_dynamic = []
+    log_jones_w3_dynamic = []
+    log_jones_w5_dynamic = []
+
+    # Check if we have 3 assigned knots
+    if len(assigned_leptons) != 3 or any(name == 'N/A' for name in assigned_knot_names):
+        print("ERROR: Need exactly 3 assigned knots from Phase 2 for dynamic fit. Skipping.")
+        log_fit_data_valid = False
+    else:
+        # Gather data for assigned knots
+        for i, lepton in enumerate(assigned_leptons):
+            knot_name = assigned_knot_names[i]
+            req_c1 = C1_REQUIRED_TARGETS.get(lepton)
+            knot_data = knot_invariant_data.get(knot_name)
+
+            if req_c1 is None:
+                print(f"ERROR: Missing required c1 for assigned {lepton} ({knot_name}). Skipping fit.")
+                log_fit_data_valid = False; break
+            if knot_data is None:
+                print(f"ERROR: Missing invariant data for assigned knot {knot_name}. Skipping fit.")
+                log_fit_data_valid = False; break
+
+            target_c1_dynamic.append(req_c1)
+            if knot_data['log_abs_jones_w3'] is None:
+                 print(f"Warning: Missing log|J(ω3)| for assigned knot {knot_name}. Cannot perform ω3 fit.")
+                 # Set flag or handle incomplete data during fitting
+            else: log_jones_w3_dynamic.append(knot_data['log_abs_jones_w3'])
+            if knot_data['log_abs_jones_w5'] is None:
+                 print(f"Warning: Missing log|J(ω5)| for assigned knot {knot_name}. Cannot perform ω5 fit.")
+            else: log_jones_w5_dynamic.append(knot_data['log_abs_jones_w5'])
+
+    # Perform fits if data is valid and complete
+    r_squared_w3_dyn = None # Initialize for status report
+    r_squared_w5_dyn = None
+
+    if not log_fit_data_valid:
+        print("Skipping dynamic correlation fits due to missing data.")
+    else:
+        target_c1_array_dyn = np.array(target_c1_dynamic)
+        print(f"Using dynamically assigned knots: {final_assigned_knots}")
+        print(f"Target c1 values: {target_c1_array_dyn}")
+
+        # Fit vs -log|J(ω3)|
+        if len(log_jones_w3_dynamic) == 3:
+            print("\nAttempting fit: c1 = A * (-log|J(ω3)|) + B (Dynamic Assignment)")
+            x_ljw3_dyn = -np.array(log_jones_w3_dynamic) # Use negative log
+            y_c1_dyn = target_c1_array_dyn
+            try:
+                coeffs_w3_dyn = np.polyfit(x_ljw3_dyn, y_c1_dyn, 1) # Linear fit
+                A_w3_dyn, B_w3_dyn = coeffs_w3_dyn[0], coeffs_w3_dyn[1]
+                print(f"  Fit c1 ≈ {A_w3_dyn:.3f} * (-log|J(ω3)|) + {B_w3_dyn:.3f}")
+                c1_pred_w3_dyn = A_w3_dyn * x_ljw3_dyn + B_w3_dyn
+                print(f"    Predictions: e={c1_pred_w3_dyn[0]:.3f}, mu={c1_pred_w3_dyn[1]:.3f}, tau={c1_pred_w3_dyn[2]:.3f}")
+                # Calculate R^2
+                residuals_w3_dyn = y_c1_dyn - c1_pred_w3_dyn
+                r_squared_w3_dyn = 1 - np.sum(residuals_w3_dyn**2) / np.sum((y_c1_dyn - np.mean(y_c1_dyn))**2)
+                print(f"    Goodness of Fit (R²): {r_squared_w3_dyn:.3f}")
+            except Exception as e: print(f"  Fit failed for log|J(ω3)|: {e}")
+        else: print("\nSkipping fit vs log|J(ω3)| due to incomplete data for assigned knots.")
+
+        # Fit vs -log|J(ω5)|
+        if len(log_jones_w5_dynamic) == 3:
+            print("\nAttempting fit: c1 = A * (-log|J(ω5)|) + B (Dynamic Assignment)")
+            x_ljw5_dyn = -np.array(log_jones_w5_dynamic) # Use negative log
+            y_c1_dyn = target_c1_array_dyn
+            try:
+                coeffs_w5_dyn = np.polyfit(x_ljw5_dyn, y_c1_dyn, 1) # Linear fit
+                A_w5_dyn, B_w5_dyn = coeffs_w5_dyn[0], coeffs_w5_dyn[1]
+                print(f"  Fit c1 ≈ {A_w5_dyn:.3f} * (-log|J(ω5)|) + {B_w5_dyn:.3f}")
+                c1_pred_w5_dyn = A_w5_dyn * x_ljw5_dyn + B_w5_dyn
+                print(f"    Predictions: e={c1_pred_w5_dyn[0]:.3f}, mu={c1_pred_w5_dyn[1]:.3f}, tau={c1_pred_w5_dyn[2]:.3f}")
+                # Calculate R^2
+                residuals_w5_dyn = y_c1_dyn - c1_pred_w5_dyn
+                r_squared_w5_dyn = 1 - np.sum(residuals_w5_dyn**2) / np.sum((y_c1_dyn - np.mean(y_c1_dyn))**2)
+                print(f"    Goodness of Fit (R²): {r_squared_w5_dyn:.3f}")
+            except Exception as e: print(f"  Fit failed for log|J(ω5)|: {e}")
+        else: print("\nSkipping fit vs log|J(ω5)| due to incomplete data for assigned knots.")
 
     print("\n--- Correlation Search Finished ---")
     print("NOTE: Correlation fits are speculative numerology without theoretical derivation.")
     print("      More sophisticated fitting or theoretical work is needed.")
 
-
     # --- FINAL MODEL STATUS Printout (incorporating results) ---
     print("\n" + "="*20 + " FINAL MODEL STATUS " + "="*20)
-    print("(LSC Comprehensive Particle Model - v13 w/ Hybrid ID & Correlation Test):")
+    # Use a version number consistent with changes
+    print("(LSC Comprehensive Particle Model - v14 w/ Hybrid ID & Log|J(q)| Correlation Test):")
     # Final assignment based on braid search complexity ordering
     electron_knot = final_assigned_knots.get('electron','N/A')
     muon_knot = final_assigned_knots.get('muon','N/A')
     tau_knot = final_assigned_knots.get('tau','N/A')
+    # Ensure final_consistent is defined (might not be if braid search failed early)
+    final_consistent = final_consistent if 'final_consistent' in locals() else False
+
     print(f"  - Lepton Hierarchy (Braid Search): Assigning simplest chiral knots by Nc ")
     print(f"     ({electron_knot}(e), {muon_knot}(mu), {tau_knot}(tau))")
     print(f"     Consistent Complexity Ordering Found: {final_consistent}")
@@ -859,31 +969,45 @@ if __name__ == "__main__":
     print(f"     Required c1 values: {c1_e}, {c1_mu}, {c1_tau}")
 
     # Report on Correlation Search based on FIXED hypothesis (3_1, 5_1, 5_2)
-    print(f"  - Correlation Search (Hypothesis: 3_1(e), 5_1(mu), 5_2(tau)):\")")
+    print(f"  - Correlation Search (Fixed Hypothesis: 3_1(e), 5_1(mu), 5_2(tau)):")
     # Check if fits were attempted
-    if fit_attempted: # Use the flag
-        print(f"     Fit attempt results vs target c1({C1_REQUIRED_FOR_FIT.get('3_1', 0):.3f}, {C1_REQUIRED_FOR_FIT.get('5_1', 0):.3f}, {C1_REQUIRED_FOR_FIT.get('5_2', 0):.3f}):")
-        # Report Nc Fit (indicate skipped)
+    if fixed_fit_attempted: # Use the flag
+        print(f"     Fit attempt results vs target c1({C1_REQUIRED_FOR_FIXED_FIT.get('3_1', 0):.3f}, {C1_REQUIRED_FOR_FIXED_FIT.get('5_1', 0):.3f}, {C1_REQUIRED_FOR_FIXED_FIT.get('5_2', 0):.3f}):")
         print("       Nc fit: Skipped (Nc unavailable).")
-        # Report Signature Fit
-        try: print(f"       Sig fit (A*|Sig|+B): Pred=({c1_pred_sig[0]:.3f}, {c1_pred_sig[1]:.3f}, {c1_pred_sig[2]:.3f})")
-        except NameError: print("       Sig fit: Not performed or failed.")
-         # Report Jones Fit
-        try: print(f"       J(ω5) fit (A/J+B): Pred=({c1_pred_jones[0]:.3f}, {c1_pred_jones[1]:.3f}, {c1_pred_jones[2]:.3f})")
-        except NameError: print("       J(ω5) fit: Not performed or failed.")
+        if c1_pred_sig is not None: print(f"       Sig fit (A*|Sig|+B): Pred=({c1_pred_sig[0]:.3f}, {c1_pred_sig[1]:.3f}, {c1_pred_sig[2]:.3f})")
+        else: print("       Sig fit: Not performed or failed.")
+        if c1_pred_jones is not None: print(f"       |J(ω5)| fit (A/|J|+B): Pred=({c1_pred_jones[0]:.3f}, {c1_pred_jones[1]:.3f}, {c1_pred_jones[2]:.3f})")
+        else: print("       |J(ω5)| fit: Not performed or failed.")
     else:
-        print("     Fit attempt skipped due to missing invariant data or c1 targets.")
-    print("     Status: Simple correlations inconclusive.")
+        print("     Fixed Fit attempt skipped due to missing invariant data or c1 targets.")
+    # print("     Status: Simple correlations inconclusive.") # Moved status to new section
+
+    # Report on Correlation Search based on DYNAMIC assignment vs -log|J(q)|
+    print(f"  - Correlation Search (Dynamic Assignment vs -log|J(q)|):")
+    if log_fit_data_valid:
+         fit_desc = "Fits performed:"
+         if r_squared_w3_dyn is not None: fit_desc += f" vs -log|J(ω3)| (R²={r_squared_w3_dyn:.3f})"
+         else: fit_desc += " vs -log|J(ω3)| (Skipped/Failed)"
+         if r_squared_w5_dyn is not None: fit_desc += f"; vs -log|J(ω5)| (R²={r_squared_w5_dyn:.3f})"
+         else: fit_desc += "; vs -log|J(ω5)| (Skipped/Failed)"
+         print(f"     {fit_desc}")
+    else:
+         print("     Log|J(q)| Fit attempt skipped due to missing assigned knots or invariant data.")
+    print(f"     Overall Status: Correlations remain speculative.")
 
     # Placeholder for neutrino C_g value if not defined elsewhere
-    neutrino_Cg_fit = 0.0
+    neutrino_Cg_fit = 0.0 # Needs to be calculated/fitted elsewhere if desired
     print(f"  - Neutral Neutrino: Requires k ~ C_g*(E0/Ep)^2 (Needs C_g≈{neutrino_Cg_fit:.3f}).")
 
     print("  - CORE THEORETICAL CHALLENGES:")
     print("      1. Derive c1(Knot Topology) function yielding correct values for assigned chiral knots (from braid search).")
-    print("      2. Test c1 correlation hypothesis (3_1, 5_1, 5_2) with more sophisticated invariants/fits.")
+    print("         -> Test relationship with invariants like |Signature|, Det, or log|J(q)|.")
+    print("      2. Test FIXED c1 correlation hypothesis (3_1, 5_1, 5_2) with more sophisticated invariants/fits.") # Kept for reference
     print("      3. Confirm Achiral Knots (e.g., 4_1, 6_2) Map to Neutral Particles (Neutrinos?).")
     print("      4. Derive Gravitational Coupling C_g(Knot Topology) for Achiral Knots.")
+    # Add other core challenges back if relevant
+    print("      5. Formalize Spinor Phase, Vertex/Propagators, g-2, SU(3)/Confinement, Photon model...")
+
 
     # --- Debug Trefoil Detection (kept for verification) ---
     print("\n" + "="*20 + " DEBUGGING TREFOIL " + "="*20)
@@ -902,12 +1026,3 @@ if __name__ == "__main__":
          print("Debug function 'debug_trefoil_detection' not defined.") # Should not happen now
     except Exception as e_debug:
          print(f"Error running debug function: {e_debug}")
-
-
-# --- Remove leftover debug function definitions at the end ---
-# (No longer needed as it's defined at the top)
-# if 'debug_trefoil_detection' not in locals():
-#      def debug_trefoil_detection(error_state=None):
-#          print("Basic debug_trefoil_detection stub called.")
-#          # Add minimal test if needed
-#          pass
