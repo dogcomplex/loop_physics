@@ -1,13 +1,11 @@
-# --- LSC Stability Filter (v13 -> v14: Hybrid ID + Log Jones Correlation) ---
-# --- Searching for Candidate Topologies & Correlating Invariants ---
-
 import numpy as np
 import math
 import sys
 import time
 import signal
 import collections
-import re # For parsing braid strings if needed later
+import re
+# --- LSC Stability Filter (v15 -> v16: Expand Invariant Fits -> v17: Refactor Fits, Add Multi-Var) ---\n# --- Searching for Candidate Topologies & Correlating Invariants ---\n\nimport numpy as np\nimport math\nimport sys\nimport time\nimport signal\nimport collections\nimport re # For parsing braid strings if needed later
 # import sympy # REMOVED - Using Sage polynomials directly
 
 # Attempt import
@@ -53,6 +51,7 @@ print("\n--- Loading LSC Hybrid Search & Invariant Correlator ---")
 print("--- v14: Added test for hypothesis: c1 ~ -log |Jones(K; q)| ---")
 print("--- v15: Added test for refined hypothesis: c1 ~ -alpha * log |J(K; q)| ---")
 print("--- v16: Expanded individual invariant correlation tests. ---")
+print("--- v17: Refactored fits, added multi-variable fit capability. ---")
 
 # --- Constants & Targets ---
 alpha_fine_structure = 1 / 137.035999
@@ -62,14 +61,24 @@ TARGET_ENERGY_MUON = 8.65429e-21
 TARGET_ENERGY_TAU = 1.45532e-19
 ASSUMED_C_TUNNEL = 1.0
 def get_required_c1(E0_natural, C_tunnel=1.0):
+    # --- Debug Print ---
+    # print(f"DEBUG: get_required_c1 called with E0={E0_natural:.4e}")
     k_required = (2 * E0_natural)**2
     if k_required <= 0: return None
     try:
         log_arg = k_required / C_tunnel
-        if log_arg <= np.finfo(float).tiny: return np.inf
+        # --- Debug Print ---
+        # print(f"DEBUG: k_required={k_required:.4e}, log_arg={log_arg:.4e}")
+        if log_arg <= np.finfo(float).tiny:
+            print(f"WARN: log_arg ({log_arg:.4e}) too small for log, returning inf for E0={E0_natural:.4e}")
+            return np.inf # Or perhaps None is better?
         c1 = -alpha_fine_structure * np.log(log_arg)
+        # --- Debug Print ---
+        # print(f"DEBUG: Calculated c1={c1:.4f}")
         return c1 if c1 > 0 else None
-    except Exception: return None
+    except Exception as e:
+        print(f"ERROR in get_required_c1 for E0={E0_natural:.4e}: {e}") # Print exception
+        return None
 
 # C1 required based *purely* on energy targets (for hierarchy check)
 C1_REQUIRED_TARGETS = {
@@ -121,6 +130,15 @@ KNOWN_BRAIDS = {
 
 MAX_BRAID_LENGTH = 12 # Default, adjusted per strand count later
 N_STRANDS_TO_CHECK = [2, 3, 4]
+
+# --- sklearn Import ---
+try:
+    from sklearn.linear_model import LinearRegression
+    SKLEARN_AVAILABLE = True
+    print("INFO: sklearn library found, multi-variable regression enabled.")
+except ImportError:
+    print("WARNING: sklearn library not found. Multi-variable regression will be skipped.")
+    SKLEARN_AVAILABLE = False
 
 # --- Helper Functions ---
 def get_knot_manifold(name):
@@ -1198,3 +1216,169 @@ if __name__ == "__main__":
          print("Debug function 'debug_trefoil_detection' not defined.") # Should not happen now
     except Exception as e_debug:
          print(f"Error running debug function: {e_debug}")
+
+    # --- Subsection 4.4: Multi-Variable Fit Example (Dynamic Assignment) ---
+    print("\n--- 4.4: Multi-Variable Fit Test (Example: c1 vs -log|J(ω5)| and |Signature|) ---")
+
+    if not SKLEARN_AVAILABLE:
+        print("  Skipping multi-variable fit: sklearn library not available.")
+    elif not log_fit_data_valid:
+        print("  Skipping multi-variable fit due to missing dynamic assignment data.")
+    else:
+        print(f"Using dynamically assigned knots: {final_assigned_knots}")
+        multi_var_data_valid = True
+        X_multi_var = [] # List of lists for features
+        y_multi_var = [] # Target variable (c1)
+
+        # Define features to include (keys from knot_invariant_data)
+        # Example: Use -log|J(ω5)| and |Signature|
+        feature_keys = ['log_abs_jones_w5', 'signature']
+        feature_names = ['(-log|J(ω5)|)', '|Signature|'] # Names for reporting
+
+        for i, lepton in enumerate(assigned_leptons):
+            knot_name = assigned_knot_names[i]
+            knot_data = knot_invariant_data.get(knot_name)
+            req_c1 = C1_REQUIRED_TARGETS.get(lepton)
+
+            if req_c1 is None or knot_data is None:
+                multi_var_data_valid = False; break # Should be caught by log_fit_data_valid check
+
+            features_for_knot = []
+            for k, key in enumerate(feature_keys):
+                raw_value = knot_data.get(key)
+                if raw_value is None:
+                    print(f"  Skipping multi-var fit: Missing feature '{key}' for {knot_name}.")
+                    multi_var_data_valid = False; break
+                # Apply transformations (ensure numeric first)
+                try:
+                    numeric_val = float(raw_value) # Assume log/abs done in calculate_invariants
+                    if key == 'log_abs_jones_w5':
+                        features_for_knot.append(-numeric_val) # Apply sign for -log|J|
+                    elif key == 'signature':
+                        features_for_knot.append(abs(numeric_val))
+                    else:
+                        features_for_knot.append(numeric_val) # Add other transformations if needed
+                except Exception as e:
+                    print(f"  Skipping multi-var fit: Error processing feature '{key}' for {knot_name}: {e}")
+                    multi_var_data_valid = False; break
+            if not multi_var_data_valid: break
+
+            X_multi_var.append(features_for_knot)
+            y_multi_var.append(req_c1)
+
+        if multi_var_data_valid and len(X_multi_var) == 3:
+            X_multi_array = np.array(X_multi_var)
+            y_multi_array = np.array(y_multi_var)
+
+            try:
+                model = LinearRegression()
+                model.fit(X_multi_array, y_multi_array)
+                coeffs_multi = model.coef_
+                intercept_multi = model.intercept_
+                r_squared_multi = model.score(X_multi_array, y_multi_array)
+
+                coeff_str = " + ".join([f"{c:.3f}*{fn}" for c, fn in zip(coeffs_multi, feature_names)])
+                print(f"  Multi-Var Fit: c1 ≈ {coeff_str} + {intercept_multi:.3f}")
+                print(f"    Goodness of Fit (R²): {r_squared_multi:.4f}")
+                print(f"    Intercept: {intercept_multi:.4f}")
+                is_mv_offset_zero = abs(intercept_multi) < offset_threshold
+                print(f"    Intercept near zero (abs < {offset_threshold}): {is_mv_offset_zero}")
+
+            except Exception as e_mv_fit:
+                print(f"  Multi-variable fit failed: {e_mv_fit}")
+        elif multi_var_data_valid:
+            print(f"  Skipping multi-var fit: Expected 3 data points, got {len(X_multi_var)}. Please check input data.")
+        # else: reason for skipping already printed
+
+    print("\n--- Correlation Search Finished ---")
+    print("NOTE: Correlation fits are speculative numerology without theoretical derivation.")
+    print("      More sophisticated fitting or theoretical work is needed.")
+
+    # --- FINAL MODEL STATUS Printout (incorporating results) --- (Phase 5)
+    print("\n" + "="*20 + " PHASE 5: FINAL MODEL STATUS " + "="*20)
+    # Use a version number consistent with changes
+    print("(LSC Comprehensive Particle Model - v17 w/ Refactored Fits & Multi-Var Test):")
+    # Final assignment based on braid search complexity ordering
+    electron_knot = final_assigned_knots.get('electron','N/A')
+    muon_knot = final_assigned_knots.get('muon','N/A')
+    tau_knot = final_assigned_knots.get('tau','N/A')
+    # Ensure final_consistent is defined (might not be if braid search failed early)
+    final_consistent = final_consistent if 'final_consistent' in locals() else False
+
+    print(f"  - Lepton Hierarchy (Braid Search): Assigning simplest chiral knots by Nc ")
+    print(f"     ({electron_knot}(e), {muon_knot}(mu), {tau_knot}(tau))")
+    print(f"     Consistent Complexity Ordering Found: {final_consistent}")
+    # Print required c1 values for this assignment
+    c1_e = f"c1({electron_knot})≈{C1_REQUIRED_TARGETS.get('electron',0):.3f}" if electron_knot != 'N/A' else "c1(?)≈N/A"
+    c1_mu = f"c1({muon_knot})≈{C1_REQUIRED_TARGETS.get('muon',0):.3f}" if muon_knot != 'N/A' else "c1(?)≈N/A"
+    c1_tau = f"c1({tau_knot})≈{C1_REQUIRED_TARGETS.get('tau',0):.3f}" if tau_knot != 'N/A' else "c1(?)≈N/A"
+    print(f"     Required c1 values: {c1_e}, {c1_mu}, {c1_tau}")
+
+    # Report on Correlation Search based on FIXED hypothesis (3_1, 5_1, 5_2)
+    print(f"  - Correlation Search (Fixed Hypothesis: 3_1(e), 5_1(mu), 5_2(tau)):")
+    if fixed_fit_attempted: # Use the flag
+        print(f"     Individual linear fits (c1 vs Invariant) performed for various invariants (see Phase 4.1 output).")
+        # Specific previous fits removed, summary now refers to the loop output.
+    else:
+        print("     Fixed Fit attempt skipped due to missing invariant data or c1 targets.")
+    # print("     Status: Simple correlations inconclusive.") # Moved status to new section
+
+    # Report on Correlation Search based on DYNAMIC assignment vs -log|J(q)|
+    print(f"  - Correlation Search (Dynamic Assignment vs -log|J(q)|):")
+    if log_fit_data_valid:
+         fit_desc = "Fits performed:"
+         if r_squared_w3_dyn is not None: fit_desc += f" vs -log|J(ω3)| (R²={r_squared_w3_dyn:.3f})"
+         else: fit_desc += " vs -log|J(ω3)| (Skipped/Failed)"
+         if r_squared_w5_dyn is not None: fit_desc += f"; vs -log|J(ω5)| (R²={r_squared_w5_dyn:.3f})"
+         else: fit_desc += "; vs -log|J(ω5)| (Skipped/Failed)"
+         print(f"     {fit_desc}")
+    else:
+         print("     Log|J(q)| Fit attempt skipped due to missing assigned knots or invariant data.")
+    print(f"     Overall Status: Correlations remain speculative.")
+
+    # Report on Refined Hypothesis Test (Ansatz 3e)
+    print(f"  - Correlation Search (Refined Hypothesis c1 ~ C_F*[-alpha*log|J(ω5)|]):")
+    if refined_fit_r_squared is not None and refined_fit_slope is not None and refined_fit_offset is not None:
+        print(f"     Fit: c1 ≈ {refined_fit_slope:.3f} * X + {refined_fit_offset:.3f} (R²={refined_fit_r_squared:.3f})")
+        print(f"     Intercept near zero: {abs(refined_fit_offset) < offset_threshold}")
+    else:
+        print("     Refined fit skipped or failed.")
+
+    # Placeholder for neutrino C_g value if not defined elsewhere
+    neutrino_Cg_fit = 0.0 # Needs to be calculated/fitted elsewhere if desired
+    print(f"  - Neutral Neutrino: Requires k ~ C_g*(E0/Ep)^2 (Needs C_g≈{neutrino_Cg_fit:.3f}).")
+
+    print("  - CORE THEORETICAL CHALLENGES:")
+    print("      1. Derive c1(Knot Topology) function yielding correct values for assigned chiral knots (from braid search).")
+    print("         -> Test relationship with invariants like |Signature|, Det, or log|J(q)|.")
+    print("         -> Test refined hypothesis c1 ≈ C_F * [-alpha*log|J(ω5)|]. If promising, derive C_F.")
+    print("      2. Test FIXED c1 correlation hypothesis (3_1, 5_1, 5_2) with more sophisticated invariants/fits.") # Kept for reference
+    print("      3. Confirm Achiral Knots (e.g., 4_1, 6_2) Map to Neutral Particles (Neutrinos?).")
+    print("      4. Derive Gravitational Coupling C_g(Knot Topology) for Achiral Knots.")
+    # Add other core challenges back if relevant
+    print("      5. Formalize Spinor Phase, Vertex/Propagators, g-2, SU(3)/Confinement, Photon model...")
+
+    # Report on Multi-Variable Fit Test
+    print(f"  - Correlation Search (Multi-Variable Example Fit):")
+    if SKLEARN_AVAILABLE and 'model' in locals() and 'r_squared_multi' in locals(): # Check if fit was attempted and successful
+        coeff_str_summary = " + ".join([f"{c:.3f}*{fn}" for c, fn in zip(coeffs_multi, feature_names)])
+        print(f"     Fit: c1 ≈ {coeff_str_summary} + {intercept_multi:.3f} (R²={r_squared_multi:.4f})")
+        print(f"     Intercept near zero: {is_mv_offset_zero}")
+    elif not SKLEARN_AVAILABLE:
+        print("     Multi-variable fit skipped: sklearn not available.")
+    else:
+        print("     Multi-variable fit skipped or failed (check Phase 4.4 output).")
+
+    # Placeholder for neutrino C_g value if not defined elsewhere
+    neutrino_Cg_fit = 0.0 # Needs to be calculated/fitted elsewhere if desired
+    print(f"  - Neutral Neutrino: Requires k ~ C_g*(E0/Ep)^2 (Needs C_g≈{neutrino_Cg_fit:.3f}).")
+
+    print("  - CORE THEORETICAL CHALLENGES:")
+    print("      1. Derive c1(Knot Topology) function yielding correct values for assigned chiral knots (from braid search).")
+    print("         -> Test relationship with invariants like |Signature|, Det, or log|J(q)|.")
+    print("         -> Test refined hypothesis c1 ≈ C_F * [-alpha*log|J(ω5)|]. If promising, derive C_F.")
+    print("      2. Test FIXED c1 correlation hypothesis (3_1, 5_1, 5_2) with more sophisticated invariants/fits.") # Kept for reference
+    print("      3. Confirm Achiral Knots (e.g., 4_1, 6_2) Map to Neutral Particles (Neutrinos?).")
+    print("      4. Derive Gravitational Coupling C_g(Knot Topology) for Achiral Knots.")
+    # Add other core challenges back if relevant
+    print("      5. Formalize Spinor Phase, Vertex/Propagators, g-2, SU(3)/Confinement, Photon model...")
