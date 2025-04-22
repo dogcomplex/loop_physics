@@ -78,4 +78,7 @@ The `fermion.py` script has fewer dependencies (primarily `numpy`) and can be ru
 python fermion.py
 ```
 
+---
+Knot visuals generated using [KnotPlot](https://knotplot.com/).
+
 https://chatgpt.com/share/6802c804-cb1c-8003-ba55-92068f6256b9
