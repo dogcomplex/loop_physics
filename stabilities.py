@@ -1218,22 +1218,23 @@ if __name__ == "__main__":
          print(f"Error running debug function: {e_debug}")
 
     # --- Subsection 4.4: Multi-Variable Fit Example (Dynamic Assignment) ---
-    print("\n--- 4.4: Multi-Variable Fit Test (Example: c1 vs -log|J(ω5)| and |Signature|) ---")
+    print("\n--- 4.4: Multi-Variable Fit Test (c1 vs log|Det| and |Signature|) ---")
 
     if not SKLEARN_AVAILABLE:
         print("  Skipping multi-variable fit: sklearn library not available.")
     elif not log_fit_data_valid:
         print("  Skipping multi-variable fit due to missing dynamic assignment data.")
     else:
+        mv_model = None # Define model variable outside try block for status check
         print(f"Using dynamically assigned knots: {final_assigned_knots}")
         multi_var_data_valid = True
         X_multi_var = [] # List of lists for features
         y_multi_var = [] # Target variable (c1)
 
         # Define features to include (keys from knot_invariant_data)
-        # Example: Use -log|J(ω5)| and |Signature|
-        feature_keys = ['log_abs_jones_w5', 'signature']
-        feature_names = ['(-log|J(ω5)|)', '|Signature|'] # Names for reporting
+        # Use log|Det| and |Signature|
+        feature_keys = ['log_abs_determinant', 'signature']
+        feature_names = ['log|Det|', '|Signature|'] # Names for reporting
 
         for i, lepton in enumerate(assigned_leptons):
             knot_name = assigned_knot_names[i]
@@ -1252,8 +1253,8 @@ if __name__ == "__main__":
                 # Apply transformations (ensure numeric first)
                 try:
                     numeric_val = float(raw_value) # Assume log/abs done in calculate_invariants
-                    if key == 'log_abs_jones_w5':
-                        features_for_knot.append(-numeric_val) # Apply sign for -log|J|
+                    if key == 'log_abs_determinant':
+                        features_for_knot.append(numeric_val) # Already log
                     elif key == 'signature':
                         features_for_knot.append(abs(numeric_val))
                     else:
@@ -1271,11 +1272,11 @@ if __name__ == "__main__":
             y_multi_array = np.array(y_multi_var)
 
             try:
-                model = LinearRegression()
-                model.fit(X_multi_array, y_multi_array)
-                coeffs_multi = model.coef_
-                intercept_multi = model.intercept_
-                r_squared_multi = model.score(X_multi_array, y_multi_array)
+                mv_model = LinearRegression()
+                mv_model.fit(X_multi_array, y_multi_array)
+                coeffs_multi = mv_model.coef_
+                intercept_multi = mv_model.intercept_
+                r_squared_multi = mv_model.score(X_multi_array, y_multi_array)
 
                 coeff_str = " + ".join([f"{c:.3f}*{fn}" for c, fn in zip(coeffs_multi, feature_names)])
                 print(f"  Multi-Var Fit: c1 ≈ {coeff_str} + {intercept_multi:.3f}")
@@ -1360,7 +1361,7 @@ if __name__ == "__main__":
 
     # Report on Multi-Variable Fit Test
     print(f"  - Correlation Search (Multi-Variable Example Fit):")
-    if SKLEARN_AVAILABLE and 'model' in locals() and 'r_squared_multi' in locals(): # Check if fit was attempted and successful
+    if SKLEARN_AVAILABLE and 'mv_model' in locals() and 'r_squared_multi' in locals(): # Check if fit was attempted and successful
         coeff_str_summary = " + ".join([f"{c:.3f}*{fn}" for c, fn in zip(coeffs_multi, feature_names)])
         print(f"     Fit: c1 ≈ {coeff_str_summary} + {intercept_multi:.3f} (R²={r_squared_multi:.4f})")
         print(f"     Intercept near zero: {is_mv_offset_zero}")
