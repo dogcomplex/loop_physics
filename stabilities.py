@@ -49,6 +49,7 @@ except Exception as e:
 
 print("\n--- Loading LSC Hybrid Search & Invariant Correlator ---")
 print("--- v14: Added test for hypothesis: c1 ~ -log |Jones(K; q)| ---")
+print("--- v15: Added test for refined hypothesis: c1 ~ -alpha * log |J(K; q)| ---")
 
 # --- Constants & Targets ---
 alpha_fine_structure = 1 / 137.035999
@@ -944,6 +945,50 @@ if __name__ == "__main__":
             except Exception as e: print(f"  Fit failed for log|J(ω5)|: {e}")
         else: print("\nSkipping fit vs log|J(ω5)| due to incomplete data for assigned knots.")
 
+    # --- Subsection 4.3: Test Refined Hypothesis (Ansatz 3e: c1 ~ -alpha * log|J(q)|) ---
+    print("\n--- 4.3: Correlation Test (Refined Hypothesis: c1 ≈ C_F * [-alpha*log|J(ω5)|]) ---")
+
+    if not log_fit_data_valid:
+        print("Skipping refined hypothesis test due to missing dynamic fit data.")
+        refined_fit_r_squared = None
+        refined_fit_slope = None
+        refined_fit_offset = None
+    elif len(log_jones_w5_dynamic) != 3:
+        print("Skipping refined hypothesis test due to incomplete log|J(ω5)| data for assigned knots.")
+        refined_fit_r_squared = None
+        refined_fit_slope = None
+        refined_fit_offset = None
+    else:
+        print(f"Using dynamically assigned knots: {final_assigned_knots}")
+        # Independent variable X = -alpha * log|J(ω5)|
+        x_refined = -alpha_fine_structure * np.array(log_jones_w5_dynamic)
+        y_c1_dyn = target_c1_array_dyn # Dependent variable is still required c1
+
+        print(f"Independent variable X = -alpha * log|J(ω5)| values: {x_refined}")
+        print(f"Dependent variable Y = Required c1 values: {y_c1_dyn}")
+
+        print("\nAttempting fit: c1 = C_F * X + Offset")
+        try:
+            coeffs_refined = np.polyfit(x_refined, y_c1_dyn, 1) # Linear fit
+            refined_fit_slope, refined_fit_offset = coeffs_refined[0], coeffs_refined[1] # C_F = slope
+            print(f"  Fit c1 ≈ {refined_fit_slope:.3f} * X + {refined_fit_offset:.3f}")
+            c1_pred_refined = refined_fit_slope * x_refined + refined_fit_offset
+            print(f"    Predictions: e={c1_pred_refined[0]:.3f}, mu={c1_pred_refined[1]:.3f}, tau={c1_pred_refined[2]:.3f}")
+            print(f"    Targets    : e={y_c1_dyn[0]:.3f}, mu={y_c1_dyn[1]:.3f}, tau={y_c1_dyn[2]:.3f}")
+            # Calculate R^2
+            residuals_refined = y_c1_dyn - c1_pred_refined
+            refined_fit_r_squared = 1 - np.sum(residuals_refined**2) / np.sum((y_c1_dyn - np.mean(y_c1_dyn))**2)
+            print(f"    Goodness of Fit (R²): {refined_fit_r_squared:.3f}")
+            # Check if offset is near zero
+            offset_threshold = 0.05 # Arbitrary threshold for "near zero"
+            is_offset_zero = abs(refined_fit_offset) < offset_threshold
+            print(f"    Intercept (Offset) near zero (abs < {offset_threshold}): {is_offset_zero}")
+        except Exception as e:
+             print(f"  Fit failed for refined hypothesis: {e}")
+             refined_fit_r_squared = None
+             refined_fit_slope = None
+             refined_fit_offset = None
+
     print("\n--- Correlation Search Finished ---")
     print("NOTE: Correlation fits are speculative numerology without theoretical derivation.")
     print("      More sophisticated fitting or theoretical work is needed.")
@@ -951,7 +996,7 @@ if __name__ == "__main__":
     # --- FINAL MODEL STATUS Printout (incorporating results) ---
     print("\n" + "="*20 + " FINAL MODEL STATUS " + "="*20)
     # Use a version number consistent with changes
-    print("(LSC Comprehensive Particle Model - v14 w/ Hybrid ID & Log|J(q)| Correlation Test):")
+    print("(LSC Comprehensive Particle Model - v15 w/ Hybrid ID & Refined Log|J| Correlation Test):")
     # Final assignment based on braid search complexity ordering
     electron_knot = final_assigned_knots.get('electron','N/A')
     muon_knot = final_assigned_knots.get('muon','N/A')
@@ -995,6 +1040,14 @@ if __name__ == "__main__":
          print("     Log|J(q)| Fit attempt skipped due to missing assigned knots or invariant data.")
     print(f"     Overall Status: Correlations remain speculative.")
 
+    # Report on Refined Hypothesis Test (Ansatz 3e)
+    print(f"  - Correlation Search (Refined Hypothesis c1 ~ C_F*[-alpha*log|J(ω5)|]):")
+    if refined_fit_r_squared is not None and refined_fit_slope is not None and refined_fit_offset is not None:
+        print(f"     Fit: c1 ≈ {refined_fit_slope:.3f} * X + {refined_fit_offset:.3f} (R²={refined_fit_r_squared:.3f})")
+        print(f"     Intercept near zero: {abs(refined_fit_offset) < offset_threshold}")
+    else:
+        print("     Refined fit skipped or failed.")
+
     # Placeholder for neutrino C_g value if not defined elsewhere
     neutrino_Cg_fit = 0.0 # Needs to be calculated/fitted elsewhere if desired
     print(f"  - Neutral Neutrino: Requires k ~ C_g*(E0/Ep)^2 (Needs C_g≈{neutrino_Cg_fit:.3f}).")
@@ -1002,6 +1055,7 @@ if __name__ == "__main__":
     print("  - CORE THEORETICAL CHALLENGES:")
     print("      1. Derive c1(Knot Topology) function yielding correct values for assigned chiral knots (from braid search).")
     print("         -> Test relationship with invariants like |Signature|, Det, or log|J(q)|.")
+    print("         -> Test refined hypothesis c1 ≈ C_F * [-alpha*log|J(ω5)|]. If promising, derive C_F.")
     print("      2. Test FIXED c1 correlation hypothesis (3_1, 5_1, 5_2) with more sophisticated invariants/fits.") # Kept for reference
     print("      3. Confirm Achiral Knots (e.g., 4_1, 6_2) Map to Neutral Particles (Neutrinos?).")
     print("      4. Derive Gravitational Coupling C_g(Knot Topology) for Achiral Knots.")
