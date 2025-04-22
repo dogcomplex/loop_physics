@@ -543,40 +543,70 @@ def find_simplest_braids(n_strands, max_braid_length, target_knots_info, time_li
     print(f"\n--- Analysis: Simplest Braid Reps Found ({n_strands} Strands) ---")
     if not best_braid_repr: print("No target knots found.")
     else:
+        # Define known achiral knots from the target list
+        known_achiral = {"4_1", "6_2", "6_3"} # Add others if known
+
         # Sort by canonical crossing number from TARGET_KNOTS_INFO
         sorted_found_knots = sorted(best_braid_repr.keys(), key=lambda k: TARGET_KNOTS_INFO[k][0])
         print("Simplest braid representations found/known for target knots:")
         for knot_name in sorted_found_knots:
              data = best_braid_repr[knot_name]
              nc, sig = TARGET_KNOTS_INFO[knot_name]
-             source = data.get('source', 'search')
-             print(f"  - {knot_name:<4} (Nc={nc}, Sig={sig}): Min Braid Length={data['length']} [{source.upper()}] (Braid: {format_braid_word(data['braid_tuple'])})")
+             source = data.get('source', 'search') # Get source, default to 'search'
+             # Check chirality (crudely based on name/signature - needs better check)
+             is_achiral = (knot_name in known_achiral)
+             chiral_str = "(Achiral)" if is_achiral else "(Chiral)"
+             print(f"  - {knot_name:<4} (Nc={nc}, Sig={sig}) {chiral_str}: Min Braid Length={data['length']} [{source.upper()}] (Braid: {format_braid_word(data['braid_tuple'])})")
 
-        # Lepton Assignment Check
-        print("\n--- Checking Lepton Assignment Consistency ---")
+        # Lepton Assignment Check (with Chirality Filter)
+        print("\n--- Checking Lepton Assignment Consistency (Using Chirality Filter) ---")
         target_c1_list = sorted(C1_REQUIRED.items(), key=lambda item: item[1], reverse=True)
-        # Assign found knots based on THEIR complexity order
-        found_knot_list_sorted_by_Nc = sorted(
-            [(name, TARGET_KNOTS_INFO[name][0]) for name in sorted_found_knots],
-            key=lambda item: item[1]
+
+        # Select only CHIRAL KNOTS from candidates for lepton assignment
+        chiral_knot_candidates = [
+            (name, data) for name, data in best_braid_repr.items()
+            if name in TARGET_KNOTS_INFO and name not in known_achiral # Use defined known_achiral set
+        ]
+        # Sort chiral candidates by complexity (Nc)
+        chiral_knot_list_sorted_by_Nc = sorted(
+            chiral_knot_candidates,
+            key=lambda item: TARGET_KNOTS_INFO[item[0]][0]
         )
 
+        print(f"Found {len(chiral_knot_list_sorted_by_Nc)} potentially stable chiral knot candidates for this strand count.")
+
         consistent = True
-        if len(found_knot_list_sorted_by_Nc) < len(target_c1_list):
-             print(f"  FAILURE: Not enough distinct target KNOT types found ({len(found_knot_list_sorted_by_Nc)}) to map to {len(target_c1_list)} lepton generations.")
+        if len(chiral_knot_list_sorted_by_Nc) < len(target_c1_list):
+             print(f"  FAILURE: Not enough distinct stable CHIRAL KNOT types found ({len(chiral_knot_list_sorted_by_Nc)}) to map to {len(target_c1_list)} lepton generations for this strand count.")
              consistent = False
         else:
-            print("Hypothetical Assignment (Increasing Knot Nc -> Increasing Mass / Decreasing c1):")
+            print("Hypothetical Assignment (Increasing Chiral Knot Nc -> Increasing Mass / Decreasing c1):")
             complexities = []
+            assigned_knots_local = {} # Use local variable for this scope
             for i in range(len(target_c1_list)):
                  lepton, req_c1 = target_c1_list[i]
-                 knot_name, nc = found_knot_list_sorted_by_Nc[i] # Assign by complexity order
+                 # Assign based on complexity order of *found chiral* knots
+                 knot_name, data = chiral_knot_list_sorted_by_Nc[i]
+                 nc = TARGET_KNOTS_INFO[knot_name][0]
                  complexities.append(nc)
+                 assigned_knots_local[lepton] = knot_name
                  print(f"  - {lepton.capitalize():<9}: Assigned Knot={knot_name} (Nc={nc}), Needs c1≈{req_c1:.3f}")
+
             # Check if Nc is non-decreasing
-            if not all(complexities[i] <= complexities[i+1] for i in range(len(complexities)-1)): print("  >> Warning: Complexity (Nc) ordering inconsistent.")
-            else: print("  >> Observation: Complexity (Nc) ordering potentially consistent.")
-            print("  >> Assessment: Requires derivation of c1(Topology) using these candidates.")
+            if not all(complexities[i] <= complexities[i+1] for i in range(len(complexities)-1)):
+                 print("  >> Warning: Complexity (Nc) ordering inconsistent with lepton hierarchy.")
+                 consistent = False # If ordering fails, assignment fails
+            else:
+                 print("  >> Observation: Complexity (Nc) ordering of simplest chiral knots IS consistent for this strand count.")
+
+            if consistent:
+                 print(f"  >> SUCCESS: Plausible assignment found for this strand count:")
+                 print(f"     Electron -> {assigned_knots_local.get('electron', 'N/A')}")
+                 print(f"     Muon     -> {assigned_knots_local.get('muon', 'N/A')}")
+                 print(f"     Tau      -> {assigned_knots_local.get('tau', 'N/A')}")
+                 print(f"  >> Assessment: Requires derivation of c1(Topology) yielding correct values for these knots.")
+            else:
+                 print("  >> FAILURE: Consistent assignment failed with current candidates/ordering for this strand count.")
 
     return best_braid_repr
 
@@ -604,20 +634,102 @@ if __name__ == "__main__":
 
     print("\n" + "="*40)
     print("--- FINAL SUMMARY ACROSS ALL STRANDS ---")
-    # ... (Final summary print remains same) ...
+    # Calculate combined best results
     combined_best = {}
     for n_strands, results in all_results.items():
          for name, data in results.items():
              if name not in combined_best or data['length'] < combined_best[name]['length']:
                  combined_best[name] = data; combined_best[name]['strands'] = n_strands
-    if not combined_best: print("No target knots found in any run.")
+    
+    if not combined_best: 
+        print("No target knots found in any run.")
+        final_assigned_knots = {} # Ensure dict exists even if no knots found
     else:
+        # Print overall simplest representations
         sorted_final = sorted(combined_best.keys(), key=lambda k: TARGET_KNOTS_INFO[k][0])
         print("Simplest representations found overall:")
+        known_achiral = {"4_1", "6_2", "6_3"} # Redefine for this scope
         for name in sorted_final:
             data = combined_best[name]; nc, sig = TARGET_KNOTS_INFO[name]
             source = data.get('source', 'search')
-            print(f"  - {name:<4} (Nc={nc}): Min Braid Length={data['length']} ({data['strands']} strands) [{source.upper()}] (Braid: {format_braid_word(data['braid_tuple'])})")
+            chiral_str = "(Achiral)" if name in known_achiral else "(Chiral)"
+            print(f"  - {name:<4} (Nc={nc}) {chiral_str}: Min Braid Length={data['length']} ({data['strands']} strands) [{source.upper()}] (Braid: {format_braid_word(data['braid_tuple'])})")
+
+        # --- Perform FINAL Lepton Assignment based on OVERALL simplest CHIRAL knots ---
+        print("\n--- FINAL Lepton Assignment Check (Using Chirality Filter) ---")
+        target_c1_list = sorted(C1_REQUIRED.items(), key=lambda item: item[1], reverse=True)
+        
+        # Select only CHIRAL KNOTS from overall best candidates
+        final_chiral_knot_candidates = [
+            (name, data) for name, data in combined_best.items()
+            if name in TARGET_KNOTS_INFO and name not in known_achiral 
+        ]
+        # Sort final chiral candidates by complexity (Nc)
+        final_chiral_list_sorted_by_Nc = sorted(
+            final_chiral_knot_candidates,
+            key=lambda item: TARGET_KNOTS_INFO[item[0]][0]
+        )
+        
+        print(f"Found {len(final_chiral_list_sorted_by_Nc)} distinct chiral knots overall.")
+        
+        final_consistent = True
+        final_assigned_knots = {} # Initialize final assignment dictionary
+        if len(final_chiral_list_sorted_by_Nc) < len(target_c1_list):
+             print(f"  FAILURE: Not enough distinct stable CHIRAL KNOT types found overall ({len(final_chiral_list_sorted_by_Nc)}) to map to {len(target_c1_list)} lepton generations.")
+             final_consistent = False
+        else:
+            print("Final Hypothetical Assignment (Increasing Chiral Knot Nc -> Increasing Mass / Decreasing c1):")
+            final_complexities = []
+            for i in range(len(target_c1_list)):
+                 lepton, req_c1 = target_c1_list[i]
+                 # Assign based on complexity order of *overall simplest found chiral* knots
+                 knot_name, data = final_chiral_list_sorted_by_Nc[i]
+                 nc = TARGET_KNOTS_INFO[knot_name][0]
+                 final_complexities.append(nc)
+                 final_assigned_knots[lepton] = knot_name
+                 print(f"  - {lepton.capitalize():<9}: Assigned Knot={knot_name} (Nc={nc}), Needs c1≈{req_c1:.3f}")
+            
+            # Check if Nc is non-decreasing
+            if not all(final_complexities[i] <= final_complexities[i+1] for i in range(len(final_complexities)-1)):
+                 print("  >> FINAL Warning: Complexity (Nc) ordering inconsistent with lepton hierarchy.")
+                 final_consistent = False 
+            else:
+                 print("  >> FINAL Observation: Complexity (Nc) ordering of overall simplest chiral knots IS consistent.")
+                 
+            if final_consistent:
+                 print(f"  >> FINAL SUCCESS: Plausible assignment found:")
+                 print(f"     Electron -> {final_assigned_knots.get('electron', 'N/A')}")
+                 print(f"     Muon     -> {final_assigned_knots.get('muon', 'N/A')}")
+                 print(f"     Tau      -> {final_assigned_knots.get('tau', 'N/A')}")
+                 print(f"  >> Assessment: Requires derivation of c1(Topology) yielding correct values for these knots.")
+            else:
+                 print("  >> FINAL FAILURE: Consistent assignment failed with overall best candidates.")
+                 
+    # --- Insert FINAL MODEL STATUS ---
+    print("\nFINAL MODEL STATUS (LSC Comprehensive Particle Model - v12 w/ Chirality Filter):")
+    # Placeholder for neutrino C_g value if not defined elsewhere
+    neutrino_Cg_fit = 0.0 # Default value
+    # Assuming particle_models might not exist, add checks or defaults
+    # print(f"  - Lepton Hierarchy: Assigning simplest chiral knots by Nc ({final_assigned_knots.get('electron','?')}(e), {final_assigned_knots.get('muon','?')}(mu), {final_assigned_knots.get('tau','?')}(tau))")
+    # Simplified print using the final_assigned_knots dict directly
+    print(f"  - Lepton Hierarchy: Assigning simplest chiral knots by Nc "
+          f"({final_assigned_knots.get('electron','N/A')}(e), "
+          f"{final_assigned_knots.get('muon','N/A')}(mu), "
+          f"{final_assigned_knots.get('tau','N/A')}(tau))")
+    print(f"                    requires k ~ C_t*exp(-c1(Knot)/alpha) with c1 decreasing with Nc.")
+    # Print required c1 values, handling potential missing assignments
+    c1_e = f"c1({final_assigned_knots.get('electron','?')})≈{C1_REQUIRED.get('electron',0):.3f}" if 'electron' in final_assigned_knots else "c1(?)≈N/A"
+    c1_mu = f"c1({final_assigned_knots.get('muon','?')})≈{C1_REQUIRED.get('muon',0):.3f}" if 'muon' in final_assigned_knots else "c1(?)≈N/A"
+    c1_tau = f"c1({final_assigned_knots.get('tau','?')})≈{C1_REQUIRED.get('tau',0):.3f}" if 'tau' in final_assigned_knots else "c1(?)≈N/A"
+    print(f"                    (Needs {c1_e}, {c1_mu}, {c1_tau}).")
+    print(f"      Neutral Neutrino: Requires k ~ C_g*(E0/Ep)^2 (Needs C_g≈{neutrino_Cg_fit:.3f}).") 
+    print("  - CORE THEORETICAL CHALLENGES:")
+    print("      1. Derive c1(Knot Topology) function yielding correct values for assigned chiral knots.")
+    # Add other challenges if they exist...
+    print("      2. Confirm Achiral Knots (4_1, 6_2, ...) Map to Neutral Particles (Neutrinos?).")
+    print("      3. Derive Gravitational Coupling C_g(Knot Topology) for Achiral Knots.")
+
+
     print("\n>>> Does complexity ordering match lepton hierarchy? Derivation of c1(Topology) needed.")
     print(">>> Next step: Theoretical derivation of c1(Topology) relationship.")
 
