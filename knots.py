@@ -101,15 +101,36 @@ class KnotPropertyCalculator:
         if self.link_obj: return True
         try:
             if isinstance(self.identifier, str):
-                # Try interpreting as standard name first
-                try:
-                    self.link_obj = spherogram.Link(self.identifier)
-                    # Initial name guess, might be refined by identify()
-                    self.properties['knot_atlas_name'] = self.identifier
-                except ValueError as e_name:
-                    print(f"Info: Identifier '{self.identifier}' not a standard Spherogram name ({e_name}). Cannot create link this way.")
-                    # Could add braid string parsing here if needed later
-                    return False
+                # Special case for unknot
+                if self.identifier == '0_1':
+                    print("Info: Creating Unknot via Link([])")
+                    self.link_obj = spherogram.Link([])
+                    self.properties['knot_atlas_name'] = '0_1'
+                else:
+                    # Try interpreting as standard name first
+                    try:
+                        self.link_obj = spherogram.Link(self.identifier)
+                        # Initial name guess, might be refined by identify()
+                        self.properties['knot_atlas_name'] = self.identifier
+                    except ValueError as e_name:
+                        # If Link(name) fails, try fetching from knot_db
+                        print(f"Info: Link('{self.identifier}') failed ({e_name}). Trying knot_db.")
+                        try:
+                             # Access the database - this might return Link or Knot obj
+                             k_obj = spherogram.knot_db[self.identifier]
+                             # Ensure we have a Link object for consistency
+                             if isinstance(k_obj, spherogram.Link):
+                                 self.link_obj = k_obj
+                             elif hasattr(k_obj, 'link'): # If it's a Knot obj, get its link
+                                 self.link_obj = k_obj.link()
+                             else:
+                                 raise TypeError("Object from knot_db is not Link or Knot.")
+                             self.properties['knot_atlas_name'] = self.identifier # Name is confirmed by db lookup
+                             print(f"Info: Successfully loaded '{self.identifier}' from knot_db.")
+                        except (KeyError, TypeError, AttributeError, Exception) as e_db:
+                             print(f"ERROR: Identifier '{self.identifier}' not found in knot_db or failed to process ({type(e_db).__name__}: {e_db}). Cannot create link.")
+                             self.properties['stability_heuristic'] = 'Error'
+                             return False
             elif isinstance(self.identifier, tuple):
                 # Assume it's a braid tuple
                 braid_list = [int(g) for g in self.identifier] # Ensure integers
@@ -295,6 +316,9 @@ class KnotPropertyCalculator:
                 # Use exterior() on the original link object 'l' might be safer
                 self.manifold = l.exterior()
                 vol = self.manifold.volume()
+                # --- DEBUG --- #
+                print(f"DEBUG vol for {self.identifier}: Value = {vol}, Type = {type(vol)}")
+                # --- END DEBUG --- #
                 # SnapPy volume can return complex with zero imaginary part, take real
                 props['volume'] = float(vol.real) if hasattr(vol, 'real') else float(vol)
 
@@ -308,10 +332,14 @@ class KnotPropertyCalculator:
             except AttributeError: pass # exterior() might be missing
             except Exception as e:
                 # Don't warn if volume is just zero (common for torus knots)
-                if not ('Manifold has zero volume' in str(e) or np.isclose(props.get('volume', 1.0), 0.0)):
+                current_vol = props.get('volume') # Get volume *after* potential assignment/error
+                is_likely_zero = ('Manifold has zero volume' in str(e) or 
+                                  (isinstance(current_vol, (float, int)) and np.isclose(current_vol, 0.0)))
+                if not is_likely_zero:
                      print(f"Warn: Manifold/Volume calc failed for {self.identifier}: {type(e).__name__} - {e}")
                 # Ensure volume is None if calculation truly failed, but keep 0.0 if that was the result
-                if props['volume'] is None: props['volume'] = None
+                if props['volume'] is None: # If it never got set correctly in try block
+                    props['volume'] = None
 
         # --- Polynomial Calculations (Requires Sage) ---
         if SAGE_AVAILABLE:
@@ -356,7 +384,24 @@ class KnotPropertyCalculator:
                 # Alexander Polynomial
                 try:
                     # Use the Link object 'l' for Alexander polynomial, as it handles links too
-                    alex_poly_t = l.alexander_polynomial(variable=t) # Ensure using Sage variable
+                    # The variable= keyword caused TypeError in last run, remove it.
+                    alex_poly_raw = l.alexander_polynomial()
+
+                    # --- DEBUG --- #
+                    print(f"DEBUG alex_poly_raw for {self.identifier}: Value = {alex_poly_raw}, Type = {type(alex_poly_raw)}")
+                    # --- END DEBUG --- #
+
+                    # Convert to Sage Polynomial in variable t if possible and needed
+                    if SAGE_AVAILABLE and alex_poly_raw is not None and t is not None:
+                        try:
+                            # Attempt conversion to the polynomial ring T(variable=t)
+                            alex_poly_t = T(alex_poly_raw)
+                        except Exception as e_conv:
+                            print(f"Warn: Could not convert Alexander result to Sage polynomial T(t): {e_conv}")
+                            alex_poly_t = None # Failed conversion
+                    else:
+                        alex_poly_t = alex_poly_raw # Use raw value if not using Sage or it's None
+
                     if alex_poly_t is not None: # Can be None for multi-component links if unnormalized
                          if alex_poly_t.is_zero():
                              # Alexander poly is 0 for split links, but shouldn't be for knots (unless unknot?)
