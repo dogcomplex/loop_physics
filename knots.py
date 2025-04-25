@@ -68,25 +68,37 @@ class KnotPropertyCalculator:
         self.knot_obj = None         # Spherogram Knot object (if single component)
         self.manifold = None
         self.properties = {
+            # Core Identifiers
             'input_identifier': identifier, # Keep track of original input
             'source_description': source_description,
-            'knot_atlas_name': None, # Standard name like 3_1, L10a140
+            'knot_atlas_name': None, # Standard name like 3_1, L10a140 (best guess)
+            # Basic Topology
             'components': None,
-            'crossing_number_min': None, # Minimal crossing number from identification
+            'crossing_number_min': None, # Minimal crossing number from identification (unavailable)
             'signature': None,
             'determinant': None,
             'log_abs_determinant': None, # Log of absolute determinant
             'volume': None, # Hyperbolic volume
+            # Diagrammatic Properties
+            'writhe': None, # Diagrammatic writhe
+            'morse_number': None, # Diagrammatic Morse number (optional calc)
             'is_alternating': None,
-            'is_chiral': None, # True if chiral, False if amphichiral
+            # Chirality / Symmetry
+            'is_chiral': None, # True if chiral, False if amphichiral (unavailable)
+            # Structural Properties
             'is_torus': None, # Is it a torus knot? (Often heuristic based on volume/name)
-            'is_fibered': None, # Is it fibered?
+            'is_fibered': None, # Is it fibered? (From basic checks, may be inaccurate)
+            'is_fibered_hfk': None, # Is it fibered? (From HFK calculation, more robust, optional)
+            'seifert_genus': None, # Seifert genus (From HFK calculation, optional)
+            # Polynomials & Evaluations
             'alexander_poly': None, # Store polynomial object if possible
             'jones_poly': None,     # Store polynomial object if possible
             'alex_at_neg1': None,   # |Alexander(-1)| = Determinant (usually)
             'alex_at_neg2': None,   # Value of Alexander Polynomial at t=-2
             'jones_at_roots': {}, # Dict: {'w3': val, 'w4': val, ...}
             'log_abs_jones_at_roots': {}, # Dict: {'w3': val, 'w4': val, ...}
+            # Representations
+            'braid_word_repr': None, # Braid word representation (tuple/string)
             # Properties needing more theoretical definition / postulates
             'framing_number': 'UNKNOWN', # How is framing defined/calculated? Placeholder.
             'topological_charge_Q': 'UNKNOWN', # Mechanism needed. Placeholder.
@@ -224,6 +236,8 @@ class KnotPropertyCalculator:
         # --- Proceed for non-Unknot cases --- #
         if not self._create_link_object():
             print(f"Skipping invariant calculation for '{self.identifier}' due to creation failure.")
+            # Ensure stability heuristic reflects failure
+            if props['stability_heuristic'] != 'Error': props['stability_heuristic'] = 'LinkCreationFailed'
             return # Stability heuristic already set in _create_link_object on error
 
         l = self.link_obj
@@ -334,16 +348,19 @@ class KnotPropertyCalculator:
             props['stability_heuristic'] = 'IdentifyError'
 
 
-        # --- Calculate other invariants (use object 'k') ---
+        # --- Calculate other invariants (use object 'k' if available, else 'l') ---
+        calc_obj = k if k else l # Use Knot object if conversion succeeded, else Link object
+
         # Check if we already determined it's an unknot
         if props['stability_heuristic'] != 'Unknot':
-            try: props['signature'] = k.signature()
+            # Basic Invariants
+            try: props['signature'] = calc_obj.signature()
             except AttributeError: print(f"Warn: 'signature' method not found for {self.identifier}.")
             except ImportError: print(f"Warn: Signature calc failed (likely missing SnapPy/Sage) for {self.identifier}.")
             except Exception as e: print(f"Warn: Signature calc failed for {self.identifier}: {type(e).__name__} - {e}")
 
             try:
-                det = k.determinant()
+                det = calc_obj.determinant()
                 # Spherogram determinant() often returns rational, ensure it's int for knots
                 if SAGE_AVAILABLE and isinstance(det, sage.all.Rational):
                     if det.denominator() == 1:
@@ -361,18 +378,27 @@ class KnotPropertyCalculator:
             except ImportError: print(f"Warn: Determinant calc failed (likely missing SnapPy/Sage) for {self.identifier}.")
             except Exception as e: print(f"Warn: Determinant calc failed for {self.identifier}: {type(e).__name__} - {e}")
 
-            try: props['is_alternating'] = k.is_alternating()
+            # Diagrammatic Properties
+            try: props['is_alternating'] = calc_obj.is_alternating()
             except AttributeError: print(f"Warn: 'is_alternating' method not found for {self.identifier}.")
             except Exception as e: print(f"Warn: Alternating check failed: {type(e).__name__} - {e}")
 
-            try: props['is_chiral'] = not k.is_amphichiral()
-            except AttributeError: print(f"Warn: 'is_amphichiral' method not found for {self.identifier}.")
+            try: props['writhe'] = calc_obj.writhe()
+            except AttributeError: print(f"Warn: 'writhe' method not found for {self.identifier}.")
+            except Exception as e: print(f"Warn: Writhe calculation failed: {type(e).__name__} - {e}")
+
+            # Chirality (method known to be missing)
+            try:
+                # This will likely fail based on previous runs, but keep for completeness
+                props['is_chiral'] = not calc_obj.is_amphichiral()
+            except AttributeError: pass # Expected failure: print(f"Warn: 'is_amphichiral' method not found for {self.identifier}.")
             except Exception as e: print(f"Warn: Chirality check failed: {type(e).__name__} - {e}")
 
-            try: props['is_fibered'] = k.is_fibered()
+            # Fibering (basic check)
+            try: props['is_fibered'] = calc_obj.is_fibered()
             except AttributeError: pass # Method might not exist depending on version/backend
             except NotImplementedError: pass # Some knots might not have this implemented
-            except Exception as e: print(f"Warn: Fibered check failed: {type(e).__name__} - {e}")
+            except Exception as e: print(f"Warn: Fibered check (basic) failed: {type(e).__name__} - {e}")
 
             # --- Manifold Properties (using SnapPy via Spherogram) ---
             try:
@@ -415,7 +441,7 @@ class KnotPropertyCalculator:
             if props['stability_heuristic'] != 'Unknot': # Skip for unknot if already set
                 # Jones Polynomial
                 try:
-                    jones_poly_q = k.jones_polynomial(variable=q_var)
+                    jones_poly_q = calc_obj.jones_polynomial(variable=q_var)
                     props['jones_poly'] = str(jones_poly_q) # Store as string
                     # Evaluate at roots of unity
                     for name, root in ROOTS_OF_UNITY.items():
@@ -489,7 +515,12 @@ class KnotPropertyCalculator:
                                  props['alex_at_neg2'] = abs(int(val_neg2)) if val_neg2.is_integer() else abs(float(val_neg2))
                              except Exception as e_alex2: print(f"Warn: Alex(-2) eval failed: {e_alex2}")
                     else:
-                        print(f"Info: Alexander polynomial returned None for {self.identifier}.")
+                        # If alex_poly_t is None, but raw was not (e.g. Sage conversion failed)
+                        if alex_poly_raw is not None:
+                            props['alexander_poly'] = str(alex_poly_raw) # Store raw string representation
+                        else:
+                            print(f"Info: Alexander polynomial returned None for {self.identifier}.")
+                            props['alexander_poly'] = None # Explicitly None
 
                 except AttributeError: print(f"Warn: 'alexander_polynomial' method not found for {self.identifier}.")
                 except ImportError: print(f"Warn: Alexander calc failed (likely missing SnapPy/Sage) for {self.identifier}.")
@@ -502,6 +533,47 @@ class KnotPropertyCalculator:
         if det_prop is not None and alex1_prop is not None and det_prop != alex1_prop:
              print(f"Warn: Determinant ({det_prop}) and |Alexander(-1)| ({alex1_prop}) mismatch for {self.identifier}.")
 
+        # --- Other Representations and Optional Calculations ---
+        if props['stability_heuristic'] != 'Unknot':
+            # Braid Word
+            try:
+                braid_word = calc_obj.braid_word()
+                # Store as tuple of integers for potential later use
+                props['braid_word_repr'] = tuple(braid_word)
+            except AttributeError: print(f"Warn: 'braid_word' method not found for {self.identifier}.")
+            except Exception as e:
+                print(f"Warn: Braid word calculation failed: {type(e).__name__} - {e}")
+
+            # Morse Number (Optional)
+            try:
+                props['morse_number'] = calc_obj.morse_number()
+            except AttributeError: pass # Morse number method might not exist
+            except ImportError: pass # May depend on external solver like GLPK
+            except Exception as e:
+                # Avoid verbose warnings for optional calcs unless clearly an error
+                if 'GLPK' not in str(e) and 'CBC' not in str(e):
+                     print(f"Warn: Morse number calculation failed: {type(e).__name__} - {e}")
+
+            # Knot Floer Homology (Optional - requires external HFKCalculator)
+            try:
+                hfk_results = calc_obj.knot_floer_homology()
+                if isinstance(hfk_results, dict):
+                    props['seifert_genus'] = hfk_results.get('seifert_genus')
+                    props['is_fibered_hfk'] = hfk_results.get('fibered')
+                    # Could store total_rank or rank details if needed
+                    # props['hfk_total_rank'] = hfk_results.get('total_rank')
+            except ImportError:
+                # Usually means HFKCalculator command is not found
+                print("Info: Knot Floer Homology calculation skipped (requires external HFKCalculator)." )
+                # Only print this info once maybe?
+                pass
+            except FileNotFoundError:
+                 print("Info: Knot Floer Homology calculation skipped (HFKCalculator command not found in PATH)." )
+                 pass
+            except Exception as e:
+                # Avoid printing error for every knot if tool is just missing
+                if 'HFKCalculator' not in str(e):
+                    print(f"Warn: Knot Floer Homology calculation failed: {type(e).__name__} - {e}")
 
     def get_property(self, prop_name):
         return self.properties.get(prop_name, None)
@@ -519,13 +591,21 @@ class KnotPropertyCalculator:
         # Define order or skip certain keys if needed
         skip_keys = {'input_identifier', 'source_description', 'knot_atlas_name'}
         key_order = [
-            'stability_heuristic', 'components', 'crossing_number_min', 'signature',
-            'determinant', 'log_abs_determinant', 'volume', 'is_alternating', 'is_chiral',
-            'is_torus', 'is_fibered', 'alexander_poly', 'jones_poly',
+            # Core ID & Topology
+            'stability_heuristic', 'components', 'crossing_number_min',
+            'signature', 'determinant', 'log_abs_determinant', 'volume',
+            # Diagrammatic
+            'writhe', 'morse_number', 'is_alternating',
+            # Structure
+            'is_chiral', 'is_torus', 'is_fibered', 'is_fibered_hfk', 'seifert_genus',
+            # Polynomials & Evaluations
+            'alexander_poly', 'jones_poly',
             'alex_at_neg1', 'alex_at_neg2', 'jones_at_roots', 'log_abs_jones_at_roots',
-            # Placeholders last
+            # Representations
+            'braid_word_repr',
+            # Placeholders
             'framing_number', 'topological_charge_Q', 'dynamic_stiffness_k', 'effective_inertia_m_eff'
-            ]
+        ]
 
         reported_keys = set()
 
@@ -716,8 +796,13 @@ if __name__ == "__main__":
 
     # --- Phase 1: Calculate Properties of Base Knots ---
     print("\n--- PHASE 1: Calculating Invariants for Base Knots ---")
-    # Include unknot '0_1' for reference if needed
-    base_knots = ["0_1", "3_1", "4_1", "5_1", "5_2"] # Knots relevant to leptons + reference
+    # Analyze first ~10 knots (up to 6 crossings) + unknot
+    base_knots = [
+        "0_1", "3_1", "4_1", "5_1", "5_2",
+        "6_1", "6_2", "6_3", # Knots with 6 crossings
+        "7_1", "7_2", "7_3", "7_4" # Knots with 7 crossings (first few)
+        # Add more standard knot names here as needed
+        ]
     knot_calculators = {}
     for name in base_knots:
         print(f"\nCalculating properties for: {name}")
