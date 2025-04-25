@@ -100,42 +100,65 @@ class KnotPropertyCalculator:
         """Attempts to create a spherogram Link object from the identifier."""
         if self.link_obj: return True
         try:
-            if isinstance(self.identifier, str):
+            # Handle different identifier types
+            if isinstance(self.identifier, tuple): # Braid Tuple
+                print(f"Info: Creating Link from Braid tuple {self.identifier}")
+                braid_list = [int(g) for g in self.identifier] # Ensure integers
+                # Create Braid, then get its Link object
+                braid_obj = spherogram.ClosedBraid(braid_list)
+                self.link_obj = braid_obj.link()
+                # Store the Knot object too if it's a knot
+                if self.link_obj.num_components() == 1:
+                    try: self.knot_obj = braid_obj.knot()
+                    except Exception: pass # Ignore if knot conversion fails
+                self.properties['knot_atlas_name'] = f"Braid{self.identifier}" # Temporary name
+                self.properties['source_description'] = f"Braid{self.identifier}"
+
+            elif isinstance(self.identifier, str): # String Identifier (Name)
                 # Special case for unknot
                 if self.identifier == '0_1':
                     print("Info: Creating Unknot via Link([])")
                     self.link_obj = spherogram.Link([])
                     self.properties['knot_atlas_name'] = '0_1'
+                    # Explicitly set knot_obj to None for unknot? Or create Knot([])?
+                    # Let's assume Link([]) is sufficient for now.
                 else:
-                    # Try interpreting as standard name first
+                    # spherogram.Knot() is unavailable in this environment.
+                    # Start with spherogram.Link()
                     try:
+                        # Try spherogram.Link()
+                        print(f"Info: Attempting spherogram.Link('{self.identifier}')")
                         self.link_obj = spherogram.Link(self.identifier)
-                        # Initial name guess, might be refined by identify()
+                        print(f"Info: Successfully created Link object for '{self.identifier}' via Link().")
                         self.properties['knot_atlas_name'] = self.identifier
-                    except ValueError as e_name:
-                        # If Link(name) fails, try fetching from knot_db
-                        print(f"Info: Link('{self.identifier}') failed ({e_name}). Trying knot_db.")
+                        # Since we used Link(), knot_obj is likely None unless Link() returns a Knot subclass?
+                        # We'll try the conversion later anyway.
+                        self.knot_obj = None
+                    except (ValueError, KeyError, Exception) as e_link:
+                        print(f"Info: spherogram.Link('{self.identifier}') failed ({type(e_link).__name__}: {e_link}). Falling back to knot_db...")
                         try:
-                             # Access the database - this might return Link or Knot obj
-                             k_obj = spherogram.knot_db[self.identifier]
-                             # Ensure we have a Link object for consistency
-                             if isinstance(k_obj, spherogram.Link):
-                                 self.link_obj = k_obj
-                             elif hasattr(k_obj, 'link'): # If it's a Knot obj, get its link
-                                 self.link_obj = k_obj.link()
-                             else:
-                                 raise TypeError("Object from knot_db is not Link or Knot.")
-                             self.properties['knot_atlas_name'] = self.identifier # Name is confirmed by db lookup
-                             print(f"Info: Successfully loaded '{self.identifier}' from knot_db.")
+                            # Fallback: Try knot_db
+                            print(f"Info: Attempting spherogram.knot_db['{self.identifier}']")
+                            k_obj_db = spherogram.knot_db[self.identifier]
+                            # Ensure we have a Link object for consistency
+                            if isinstance(k_obj_db, spherogram.Link):
+                                self.link_obj = k_obj_db
+                                self.knot_obj = None # Might not be a knot
+                            elif hasattr(k_obj_db, 'link'): # Check if it behaves like a Knot (has link method)
+                                self.link_obj = k_obj_db.link()
+                                # Can we assign it to knot_obj? Check if it has expected methods.
+                                if hasattr(k_obj_db, 'identify'): # Heuristic check
+                                    self.knot_obj = k_obj_db # Assume it's a knot object
+                                else:
+                                    self.knot_obj = None
+                            else:
+                                raise TypeError("Object from knot_db is not Link or Knot-like.")
+                            self.properties['knot_atlas_name'] = self.identifier # Name is confirmed by db lookup
+                            print(f"Info: Successfully loaded '{self.identifier}' from knot_db.")
                         except (KeyError, TypeError, AttributeError, Exception) as e_db:
-                             print(f"ERROR: Identifier '{self.identifier}' not found in knot_db or failed to process ({type(e_db).__name__}: {e_db}). Cannot create link.")
-                             self.properties['stability_heuristic'] = 'Error'
-                             return False
-            elif isinstance(self.identifier, tuple):
-                # Assume it's a braid tuple
-                braid_list = [int(g) for g in self.identifier] # Ensure integers
-                self.link_obj = spherogram.ClosedBraid(braid_list).link() # Get the Link object
-                self.properties['knot_atlas_name'] = f"Braid{self.identifier}" # Temporary name
+                            print(f"ERROR: Identifier '{self.identifier}' not found via Link() or knot_db ({type(e_db).__name__}: {e_db}). Cannot create object.")
+                            self.properties['stability_heuristic'] = 'Error'
+                            return False
             else:
                 print(f"ERROR: Invalid identifier type: {type(self.identifier)}")
                 self.properties['stability_heuristic'] = 'Error'
@@ -159,6 +182,46 @@ class KnotPropertyCalculator:
 
     def _calculate_properties(self):
         """Calculate standard topological invariants."""
+        # --- Special case: Unknot --- #
+        if self.identifier == '0_1':
+            if not self.link_obj:
+                # Attempt to create if not already done (should be done by __init__)
+                if not self._create_link_object():
+                     print("ERROR: Failed to create link object for unknot 0_1.")
+                     self.properties['stability_heuristic'] = 'Error'
+                     return
+
+            props = self.properties
+            print("Info: Setting properties for Unknot (0_1) directly.")
+            props['knot_atlas_name'] = "0_1"
+            props['stability_heuristic'] = 'Unknot'
+            props['components'] = 1
+            props['crossing_number_min'] = 0
+            props['signature'] = 0
+            props['determinant'] = 1
+            props['log_abs_determinant'] = 0.0 # log(1)
+            props['volume'] = 0.0
+            props['is_alternating'] = True
+            props['is_chiral'] = False
+            props['is_torus'] = True
+            props['is_fibered'] = True
+            if SAGE_AVAILABLE:
+                try: props['alexander_poly'] = str(T(1)) # Alexander poly is 1
+                except Exception: props['alexander_poly'] = '1' # Fallback string
+                try: props['jones_poly'] = str(R(1)) # Jones poly is 1
+                except Exception: props['jones_poly'] = '1' # Fallback string
+            else:
+                props['alexander_poly'] = '1'
+                props['jones_poly'] = '1'
+            props['alex_at_neg1'] = 1
+            props['alex_at_neg2'] = 1
+            # Jones at roots of unity for J=1
+            for name in ROOTS_OF_UNITY:
+                props['jones_at_roots'][name] = 1.0
+                props['log_abs_jones_at_roots'][name] = 0.0
+            return # Finished with unknot
+
+        # --- Proceed for non-Unknot cases --- #
         if not self._create_link_object():
             print(f"Skipping invariant calculation for '{self.identifier}' due to creation failure.")
             return # Stability heuristic already set in _create_link_object on error
@@ -315,12 +378,18 @@ class KnotPropertyCalculator:
             try:
                 # Use exterior() on the original link object 'l' might be safer
                 self.manifold = l.exterior()
-                vol = self.manifold.volume()
-                # --- DEBUG --- #
-                print(f"DEBUG vol for {self.identifier}: Value = {vol}, Type = {type(vol)}")
-                # --- END DEBUG --- #
+                vol = self.manifold.volume() # CALL the method!
                 # SnapPy volume can return complex with zero imaginary part, take real
-                props['volume'] = float(vol.real) if hasattr(vol, 'real') else float(vol)
+                try:
+                    # Directly convert Sage RealNumber (or other numeric types) to float
+                    props['volume'] = float(vol)
+                except TypeError:
+                    # Fallback if direct conversion fails (shouldn't happen for RealNumber, but be safe)
+                    print(f"Warn: Direct float(vol) failed for {self.identifier}. Type was {type(vol)}. Trying vol.real.")
+                    props['volume'] = float(vol.real) if hasattr(vol, 'real') else None
+                except Exception as e_vol_conv:
+                     print(f"Warn: Exception during volume float conversion for {self.identifier}: {e_vol_conv}")
+                     props['volume'] = None
 
                 # Check if Torus based on volume (heuristic) & name
                 # Only apply heuristic if volume is near zero AND it wasn't identified as unknot
@@ -383,13 +452,8 @@ class KnotPropertyCalculator:
 
                 # Alexander Polynomial
                 try:
-                    # Use the Link object 'l' for Alexander polynomial, as it handles links too
                     # The variable= keyword caused TypeError in last run, remove it.
                     alex_poly_raw = l.alexander_polynomial()
-
-                    # --- DEBUG --- #
-                    print(f"DEBUG alex_poly_raw for {self.identifier}: Value = {alex_poly_raw}, Type = {type(alex_poly_raw)}")
-                    # --- END DEBUG --- #
 
                     # Convert to Sage Polynomial in variable t if possible and needed
                     if SAGE_AVAILABLE and alex_poly_raw is not None and t is not None:

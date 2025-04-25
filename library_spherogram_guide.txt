@@ -1,0 +1,648 @@
+ SnapPyLogo
+Search docs
+Installing SnapPy
+Screenshots: SnapPy in action
+Tutorial
+The snappy module and its classes
+Using SnapPy’s link editor
+Links: planar diagrams and invariants
+Tutorial
+Random Links
+The Link class
+The ClosedBraid class
+Number theory of hyperbolic 3-manifolds
+Verified computations
+Other components
+News
+Credits
+Reporting bugs and other problems
+To Do List
+Development Basics
+ Links: planar diagrams and invariants
+Links: planar diagrams and invariants
+Tutorial
+SnapPy includes the Spherogram module which allows one to create links programmatically. The graphical conventions used are summarized here.
+
+First, here is the figure-8 knot assembled manually from four crossings, with conventions similar to those used by KnotTheory:
+
+a, b, c, d = [Crossing(x) for x in 'abcd']
+a[0], a[1], a[2], a[3] = c[1], d[0], b[1], b[0]
+b[2], b[3] = d[3], c[2]
+c[3], c[0] = d[2], d[1]
+L = Link([a,b,c,d])
+E = L.exterior()
+E.volume()
+2.029883212819
+Manifold('4_1').is_isometric_to(E)
+True
+We can also give the same knot as a rational tangle:
+
+L = RationalTangle(3,5).denominator_closure()
+L.PD_code()
+[[6, 3, 7, 4], [4, 2, 5, 1], [0, 6, 1, 5], [2, 7, 3, 0]]
+L.DT_code(True)
+'DT[dadCDAB]'
+The natural algebra of tangles shown here all works. For instance, we can build the (-2, 3, 7) pretzel knot by adding together three rational tangles:
+
+T = RationalTangle(-1, 2) + RationalTangle(1, 3) + RationalTangle(1, 7)
+L = T.numerator_closure()
+Manifold('m016').is_isometric_to(L.exterior())
+True
+To create the figure-8 knot as a closed braid, we first mash tangles together horizontally using “|” to make the standard braid generators; then multiplication in the braid group is just tangle multiplication:
+
+C, Id = RationalTangle(1), IdentityBraid(1)
+x = sigma_1 = C | Id
+y = sigma_2_inverse = Id | -C
+L = (x*y*x*y).denominator_closure()
+E = L.exterior()
+Manifold('4_1').is_isometric_to(E)
+True
+Here’s the minimally-twisted five chain from Figure 2 of this paper:
+
+def twisted_chain(n, k):
+     T = RationalTangle(1, 2)
+     m = (n+1)//2
+     base = (m*[T, -T])[:n]
+     tangles = base + [RationalTangle(k)]
+     return sum(tangles, RationalTangle(0) ).bridge_closure()
+
+>>> L = twisted_chain(5, -1)
+>>> L.exterior().volume()
+10.14941606410
+Spherogram includes ways to create very large random links, see below. When used inside Sage, one can compute many basic link invariants, including the Jones polynomial. See the complete list of Link methods below.
+
+Random Links
+spherogram.random_link(crossings, num_components='any', initial_map_gives_link=False, alternating=False, consistent_twist_regions=False, simplify='basic', prime_decomposition=True, return_all_pieces=False, max_tries=100)
+Generates a random link from a model that starts with a random 4-valent planar graph sampled with the uniform distribution by Schaeffer’s PlanarMap program.
+
+The crossings argument specifies the number of vertices of the initial planar graph G; the number of crossing in the returned knot will typically be less. The meanings of the optional arguments are as follows:
+
+num_components: The number of components of the returned link. The link naively associated to G may have too few or too many components. The former situation is resolved by picking another G, and the latter by either
+
+Taking the sublink consisting of the components with the largest self-crossing numbers.
+
+Resampling G until the desired number of components is achieved; this can take a very long time as the expected number of components associated to G grows linearly in the number of vertices.
+
+When the argument initial_map_gives_link is False the program does (a) and this is the default behavior. If you want (b) set this argument to True.
+
+To get the entire link associated to G, set num_components to `any`, which is also the default.
+
+The 4-valent vertices of G are turned into crossings by flipping a fair coin. If you want the unique alternating diagram associated to G, pass alternating=True. If you want there to be no obvious Type II Reidemeister moves, pass consistent_twist_regions=True.
+
+simplify: Whether and how to try to reduce the number of crossings of the link via Reidemeister moves using the method Link.simplify. For no simplification, set simplify=None; otherwise set simplify to be the appropriate mode for Link.simplify, for example basic (the default), level, or global.
+
+prime_decomposition: The initial link generated from G may not be prime (and typically isn’t if initial_map_gives_link is False). When set (the default), the program undoes any connect sums that are “diagrammatic obvious”, simplifies the result, and repeats until pieces are “diagrammatically prime”. If return_all_pieces is False (the default) then only the largest (apparently) prime component is returned; otherwise all summands are returned as a list.
+
+Warning: If prime_decomposition=True and return_all_pieces=False, then the link returned may have fewer components than requested. This is because a prime piece can have fewer components than the link as a whole.
+
+Some examples:
+
+K = random_link(25, num_components=1, initial_map_gives_link=True, alternating=True)
+K
+<Link: 1 comp; 25 cross>
+L= random_link(30, consistent_twist_regions=True, simplify = 'global')
+isinstance(random_link(30, return_all_pieces=True), list)
+True
+The Link class
+classspherogram.Link(crossings=None, braid_closure=None, check_planarity=True, build=True)
+Links are made from Crossings. The general model is that of the PD diagrams used in KnotTheory.
+
+See the file “doc.pdf” for the conventions, which can be accessed via “spherogram.pdf_docs()”, and the Spherogram tutorial for some examples of creating links.
+
+Here are two ways of creating the figure-8 knot, first via a PD code
+
+K1 = Link([[8,3,1,4],[2,6,3,5],[6,2,7,1],[4,7,5,8]])
+and by directly gluing up Crossings:
+
+a, b, c, d = [Crossing(x) for x in 'abcd']
+a[0], a[1], a[2], a[3] = c[1], d[0], b[1], b[0]
+b[2], b[3] = d[3], c[2]
+c[3], c[0] = d[2], d[1]
+K2 = Link([a,b,c,d])
+Some families of named links are available, such a torus knots
+
+Link('T(4, 2)')
+<Link: 2 comp; 6 cross>
+You can also construct a link by taking the closure of a braid.
+
+Link(braid_closure=[1, 2, -1, -2])
+<Link: 1 comp; 4 cross>
+WARNING: In SnapPy 3.0, the convention for braids changed. See the “doc.pdf” file for details.
+
+DT codes, in their many forms, are also accepted:
+
+L1 = Link('DT: [(4,6,2)]')
+L2 = Link('DT: cacbca.001')
+You can also access the links from the Rolfsen and Hoste-Thistlethwaite tables by name.
+
+Link('8_20')
+<Link 8_20: 1 comp; 8 cross>
+Link('K12a123')
+<Link K12a123: 1 comp; 12 cross>
+Link('L12n123')
+<Link L12n123: 2 comp; 12 cross>
+You can also convert to and from SageMath braid and link types, see the documentation for the “sage_link” method for details.
+
+DT_code(DT_alpha=False, flips=False)
+The Dowker-Thistlethwaite code for the link in either numerical or alphabetical form.
+
+L = Link('K8n1')
+L.DT_code(DT_alpha=True, flips=True)
+'DT[hahCHeAgbdf.11101000]'
+In the alphabetical form, the first letter determines the number C of crossings, the second the number L of link components, and the next L gives the number of crossings on each component; subsequent letters describe each crossing with ‘a’ being 2, ‘A’ being -2, etc.
+
+KLPProjection()
+PD_code(KnotTheory=False, min_strand_index=0)
+The planar diagram code for the link. When reconstructing a link from its PD code, it will not change the ordering of the components, and will preserve their orientation except possibly for components with only two crossings.
+
+L = Link('L13n11308')
+[len(c) for c in L.link_components]
+[4, 4, 4, 6, 8]
+L_copy = Link(L.PD_code())
+[len(c) for c in L_copy.link_components]
+[4, 4, 4, 6, 8]
+alexander_matrix(mv=True)
+Returns the Alexander matrix of the link:
+
+sage: L = Link('3_1')
+sage: A = L.alexander_matrix()
+sage: A                           # doctest: +SKIP
+([   -1     t 1 - t]
+[1 - t    -1     t]
+[    t 1 - t    -1], [t, t, t])
+
+sage: L = Link([(4,1,3,2),(1,4,2,3)])
+sage: A = L.alexander_matrix()
+sage: A                           # doctest: +SKIP
+([      -1 + t1^-1 t1^-1*t2 - t1^-1]
+[t1*t2^-1 - t2^-1       -1 + t2^-1], [t2, t1])
+alexander_poly(*args, **kwargs)
+Please use the “alexander_polynomial” method instead.
+
+alexander_polynomial(multivar=True, v='no', method='default', norm=True, factored=False)
+Calculates the Alexander polynomial of the link.
+
+For links with one component, can evaluate the alexander polynomial at v:
+
+sage: K = Link('4_1')
+sage: K.alexander_polynomial()
+t^2 - 3*t + 1
+sage: K.alexander_polynomial(v=[4])
+5
+
+sage: K = Link('L7n1')
+sage: K.alexander_polynomial(norm=False)
+t1^-1*t2^-1 + t1^-2*t2^-4
+The default algorithm for knots is Bar-Natan’s super-fast tangle-based algorithm. For links, we apply Fox calculus to a Wirtinger presentation for the link:
+
+sage: L = Link('K13n123')
+sage: L.alexander_polynomial() == L.alexander_polynomial(method='wirtinger')
+True
+all_crossings_oriented()
+alternating()
+Returns the alternating link with the same planar graph. No attempt is made to preserve the order of the link components or ensure that the DT code of the result has all positive entries (as opposed to all negative).
+
+L = Link('L14n12345')
+A = L.alternating()
+A.exterior().identify()    
+[L14a5150(0,0)(0,0)]
+backtrack(steps=10, prob_type_1=0.3, prob_type_2=0.3)
+Performs a sequence of Reidemeister moves which increase or maintain the number of crossings in a diagram. The number of such moves is the parameter steps. The diagram is modified in place.
+
+K = Link('L14a7689')
+K
+<Link L14a7689: 2 comp; 14 cross>
+K.backtrack(steps = 5, prob_type_1 = 1, prob_type_2 = 0)
+len(K.crossings)
+19
+K.backtrack(steps = 5, prob_type_1 = 0, prob_type_2 = 1)
+len(K.crossings)
+29
+black_graph()
+Returns the black graph of K.
+
+If the black graph is disconnected (which can only happen for a split link diagram), returns one connected component. The edges are labeled by the crossings they correspond to.
+
+Example:
+
+sage: K=Link('5_1')
+sage: K.black_graph()
+Subgraph of (): Multi-graph on 2 vertices
+WARNING: While there is also a “white_graph” method, it need not be the case that these two graphs are complementary in the expected way.
+
+braid_word(as_sage_braid=False)
+Return a list of integers which defines a braid word whose closure is the given link. The natural numbers 1, 2, 3, etc are the generators and the negatives are the inverses.
+
+L = Link('K6a2')
+word = L.braid_word()
+B = Link(braid_closure=word)
+B.exterior().identify()    
+[m289(0,0), 6_2(0,0), K5_19(0,0), K6a2(0,0)]
+Within Sage, you can get the answer as an element of the appropriate BraidGroup and also check our earlier work:
+
+sage: Link('K6a2').braid_word(as_sage_braid=True)
+(s0*s1^-1)^2*s0^2
+sage: L.signature(), B.signature()
+(-2, -2)
+Implementation follows P. Vogel, “Representation of links by braids, a new algorithm”.
+
+connected_sum(other_knot)
+Returns the connected sum of two knots.
+
+fig8 = [(1,7,2,6), (5,3,6,2), (7,4,0,5), (3,0,4,1)]
+K = Link(fig8)
+K.connected_sum(K)
+<Link: 1 comp; 8 cross>
+copy(recursively=False)
+Returns a copy of the link.
+
+K = Link('L14n467')
+copy = K.copy(); copy
+<Link L14n467: 2 comp; 14 cross>
+K.PD_code() == copy.PD_code()
+True
+crossing_entries()
+crossing_strands()
+deconnect_sum(destroy_original=False)
+Undoes all connect sums that are diagramatically obvious, i.e. those where there is a circle which meets the projection in two points.
+
+K5a1 = [(9,7,0,6), (3,9,4,8), (1,5,2,4), (7,3,8,2), (5,1,6,0)]
+K = Link(K5a1)
+L = K.connected_sum(K); L
+<Link: 1 comp; 10 cross>
+L.deconnect_sum()
+[<Link: 1 comp; 5 cross>, <Link: 1 comp; 5 cross>]
+determinant(method='goeritz')
+Returns the determinant of the link, a non-negative integer.
+
+Possible methods are ‘wirt’, using the Wirtinger presentation; ‘goeritz’, using the Goeritz matrix, and ‘color’, using the ‘colorability matrix’, or anything else, to compute the Alexander polynomial at -1. Example:
+
+sage: K = Link( [(4,1,5,2),(6,4,7,3),(8,5,1,6),(2,8,3,7)] )  # Figure 8 knot
+sage: K.determinant()
+5
+digraph()
+The underlying directed graph for the link diagram.
+
+dual_graph()
+The dual graph to a link diagram D, whose vertices correspond to complementary regions (faces) of D and whose edges are dual to the edges of D.
+
+exterior(with_hyperbolic_structure=True, remove_finite_vertices=True)
+The exterior or complement of the link L, that is, S^3 minus L.
+
+K = Link('4_1')
+M = K.exterior()
+M.volume() 
+2.02988321
+By default, SnapPy will try to find a hyperbolic structure on the exterior. To return a Triangulation instead of a Manifold, set the flag with_hyperbolic_structure to False. If you want to get the intermediate triangulation with extra vertices above and below the projection plane, set the flag remove_finite_vertices to False.
+
+M = K.exterior(False, False)
+(M.num_cusps(), M._num_fake_cusps())
+(1, 2)
+faces()
+The faces are the complementary regions of the link diagram. Each face is given as a list of corners of crossings as one goes around clockwise. These corners are recorded as CrossingStrands, where CrossingStrand(c, j) denotes the corner of the face abutting crossing c between strand j and j + 1.
+
+Alternatively, the sequence of CrossingStrands can be regarded as the heads of the oriented edges of the face.
+
+goeritz_matrix(return_graph=False)
+Call self.white_graph() and return the Goeritz matrix of the result. If the return_graph flag is set, also return the graph:
+
+sage: K=Link('4_1')
+sage: abs(K.goeritz_matrix().det())
+5
+is_alternating()
+Returns whether or not this link diagram is alternating.
+
+K = Link('K9a1')
+L = Link('K10n1')
+K.is_alternating(), L.is_alternating()
+(True, False)
+Of course, this is a property of the diagram not the isotopy class. Here is the Hopf link with two silly extra crossings:
+
+T = Link([(4,8,1,5),(3,6,4,5),(6,3,7,2),(1,8,2,7)])
+T.is_alternating()
+False
+T.simplify()
+True
+T.is_alternating()
+True
+is_planar()
+Whether the 4-valent graph underlying the link projection is planar.
+
+Should always be True for any actual Link.
+
+c = Crossing()
+c[0], c[1] = c[2], c[3]   # Punctured torus gluing
+bad = Link([c], check_planarity=False)
+bad.is_planar()
+False
+L = Link([(1,7,2,6), (7,4,8,5), (3,8,0,9), (5,3,6,2), (9,0,4,1)])
+L.is_planar()
+True
+A valid split link: >>> S = Link([(1, 1, 2, 2), (3, 3, 4, 4)]) >>> S.is_planar() True >>> len(S.split_link_diagram()) 2
+
+A split link with one component planar and the other nonplanar >>> a, b = Crossing(), Crossing() >>> a[0], a[2] = a[1], a[3] >>> b[0], b[1] = b[2], b[3] >>> N = Link([a, b], check_planarity=False) >>> N.is_planar() False >>> sorted(C.is_planar() for C in N.split_link_diagram()) [False, True]
+
+jones_polynomial(variable=None, new_convention=True)
+Returns the Jones polynomial of the link, following the conventions of https://arxiv.org/abs/math/0201043
+
+In particular, it obeys the oriented skein relation:
+
+q^2 V(L-) - q^-2 V(L+) = (q - q^-1) V(L0)
+and V(n-component unlink) = (q + q^-1)^(n-1).
+
+WARNING: The default conventions changed in SnapPy 3.0. You can recover the old conventions as illustrated below:
+
+sage: L = Link('8_5')
+sage: J = L.jones_polynomial(); J
+1 - q^2 + 3*q^4 - 3*q^6 + 3*q^8 - 4*q^10 + 3*q^12 - 2*q^14 + q^16
+sage: Jold = L.jones_polynomial(new_convention=False); Jold
+1 - q + 3*q^2 - 3*q^3 + 3*q^4 - 4*q^5 + 3*q^6 - 2*q^7 + q^8
+Here are the values one unlinks with 4 and 5 components:
+
+sage: U4 = Link(braid_closure=[1, -1, 2, -2, 3, -3])
+sage: U5 = Link(braid_closure=[1, -1, 2, -2, 3, -3, 4, -4])
+sage: U4.jones_polynomial().factor()
+(q^-3) * (1 + q^2)^3
+sage: U5.jones_polynomial().factor()
+(q^-4) * (1 + q^2)^4
+sage: U4.jones_polynomial(new_convention=False).factor()
+(-q^-2) * (1 + q)^3
+sage: U5.jones_polynomial(new_convention=False).factor()
+(q^-2) * (1 + q)^4
+knot_floer_homology(prime=2, complex=False)
+Uses Zoltán Szabó’s HFK Calculator to compute the knot Floer homology. This also gives the Seifert genus, whether the knot fibers, etc:
+
+K = Link('K3a1')
+K.knot_floer_homology()    
+{'L_space_knot': True,
+ 'epsilon': 1,
+ 'fibered': True,
+ 'modulus': 2,
+ 'nu': 1,
+ 'ranks': {(-1, -2): 1, (0, -1): 1, (1, 0): 1},
+ 'seifert_genus': 1,
+ 'tau': 1,
+ 'total_rank': 3}
+The homology itself is encoded by ‘ranks’, with the form:
+
+(Alexander grading, Maslov grading): dimension
+For example, here is the Conway knot, which has Alexander polynomial 1 and genus 3:
+
+L = Link('K11n34')
+ranks = L.knot_floer_homology()['ranks']
+[(a, m) for a, m in ranks if a == 3]
+[(3, 3), (3, 4)]
+ranks[3, 3], ranks[3, 4]
+(1, 1)
+Computation is done over F_2 by default, other primes less than 2^15 can be used instead via the optional “prime” parameter.
+
+If the parameter complex is set to True, then the simplified “UV = 0” knot Floer chain complex is returned. This complex is computed over the ring F[U,V]/(UV = 0), where F is the integers mod the chosen prime; this corresponds to only the horizontal and vertical arrows in the full knot Floer complex. The complex is specified by:
+
+generators: a dictionary from the generator names to their (Alexander, Maslov) gradings. The number of generators is equal to the total_rank.
+
+differential: a dictionary whose value on (a, b) is an integer specifying the coefficient on the differential from generator a to generator b, where only nonzero differentials are recorded. (The coefficient on the differential is really an element of F[U,V]/(UV = 0), but the power of U or V can be recovered from the gradings on a and b so only the element of F is recorded.)
+
+For example, to compute the vertical differential, whose homology is HFhat(S^3), you can do:
+
+sage: data = L.knot_floer_homology(prime=31991, complex=True)
+sage: gens, diff = data['generators'], data['differentials']
+sage: vert = {(i,j):diff[i, j] for i, j in diff
+...            if gens[i][1] == gens[j][1] + 1}
+sage: from sage.all import matrix, GF
+sage: M = matrix(GF(31991), len(gens), len(gens), vert, sparse=True)
+sage: M*M == 0
+True
+sage: M.right_kernel().rank() - M.rank()
+1
+knot_group()
+Computes the knot group using the Wirtinger presentation.
+
+Returns a finitely presented group:
+
+sage: K = Link('3_1')
+sage: G = K.knot_group()
+sage: type(G)
+<class 'sage.groups.finitely_presented.FinitelyPresentedGroup_with_category'>
+linking_matrix()
+Calculates the linking number for each pair of link components.
+
+Returns a linking matrix, in which the (i,j)th component is the linking number of the ith and jth link components.
+
+linking_number()
+Returns the linking number of self if self has two components; or the sum of the linking numbers of all pairs of components in general.
+
+mirror()
+Returns the mirror image of the link, preserving link orientations and component order.
+
+morse_diagram()
+Returns a MorseLinkDiagram of this link diagram, that is a choice of height function which realizes the Morse number:
+
+sage: L = Link('L8n2')
+sage: D = L.morse_diagram()
+sage: D.morse_number == L.morse_number()
+True
+sage: D.is_bridge()
+True
+sage: B = D.bridge()
+sage: len(B.bohua_code())
+64
+morse_number(solver='GLPK')
+The Morse number of a planar link diagram D is
+
+m(D) = min { # of maxima of h on D }
+
+where h is a height function on R^2 which is generic on D; alternatively, this is the minimum number of cups/caps in a MorseLink presentation of the diagram D. The Morse number is very closely related to the more traditional bridge number. Examples:
+
+sage: K = Link('5_2')
+sage: K.morse_number()
+2
+sage: Link('6^3_2').morse_number()
+3
+optimize_overcrossings()
+Minimizes the number of crossings of a strand which crosses entirely above the diagram by finding the path crossing over the diagram with the least number of overcrossings. It begins with the longest overcrossing, and continues with smaller ones until it successfully reduces the number of crossings. Returns number of crossings removed.
+
+L = Link([(10, 4, 11, 3),
+          (7, 2, 8, 3),
+          (8, 0, 9, 5),
+          (4, 10, 5, 9),
+          (1, 6, 2, 7),
+          (11, 0, 6, 1)])
+len(L)
+6
+L.simplify(mode='level')
+False
+L.optimize_overcrossings()
+1
+overstrands()
+Returns a list of the sequences of overcrossings (which are lists of CrossingEntryPoints), sorted in descending order of length.
+
+L = Link('L14n1000')
+len(L.overstrands()[0])
+3
+peer_code()
+sage_link()
+Convert to a SageMath Knot or Link:
+
+sage: L = Link('K10n11')   # Spherogram link
+sage: K = L.sage_link(); K
+Knot represented by 10 crossings
+sage: L.alexander_polynomial()/K.alexander_polynomial()  # Agree up to units
+-t^3
+sage: L.signature(), K.signature()
+(-4, -4)
+Can also go the other way:
+
+sage: L = Link('K11n11')
+sage: M = Link(L.sage_link())
+sage: L.signature(), M.signature()
+(-2, -2)
+Can also take a braid group perspective.
+
+sage: B = BraidGroup(4) sage: a, b, c = B.gens() sage: Link(braid_closure=(a**-3) * (b**4) * (c**2) * a * b * c ) <Link: 2 comp; 12 cross> sage: L = Link(a * b * c); L <Link: 1 comp; 3 cross> sage: S = L.sage_link(); S Knot represented by 3 crossings sage: Link(S) <Link: 1 comp; 3 cross>
+
+seifert_matrix()
+Returns the Seifert matrix of the link:
+
+sage: L = Link('K10n11')
+sage: A = L.seifert_matrix()
+sage: alex = L.alexander_polynomial()
+sage: t = alex.parent().gen()
+sage: B = t*A - A.transpose()
+sage: t**4 * alex == -B.det()
+True
+Uses the algorithm described in
+
+J. Collins, “An algorithm for computing the Seifert matrix of a link from a braid representation.” (2007).
+
+after first making the link isotopic to a braid closure.
+
+signature(new_convention=True)
+Returns the signature of the link, computed from the Goeritz matrix using the algorithm of Gordon and Litherland:
+
+sage: K = Link('4a1')
+sage: K.signature()
+0
+sage: L = Link('9^3_12')
+sage: Lbar = L.mirror()
+sage: L.signature() + Lbar.signature()
+0
+sage: M = Link(braid_closure=[1, 2, 1, 2, 1, 2, 1, 2])
+sage: M.signature()
+-6
+SnapPy 3.0 switched the sign convention for the signature so that “positive knots have negative signatures”. You can recover the previous default by:
+
+sage: L = Link('3a1')
+sage: L.signature()
+-2
+sage: L.signature(new_convention=False)
+2
+simplify(mode='basic', type_III_limit=100)
+Tries to simplify the link projection. Returns whether it succeeded in reducing the number of crossings. Modifies the link in place, and unknot components which are also unlinked may be silently discarded. The ordering of link_components is not always preserved.
+
+The following strategies can be employed.
+
+In the default basic mode, it does Reidemeister I and II moves until none are possible.
+
+In level mode, it does random Reidemeister III moves, reducing the number of crossings via type I and II moves whenever possible. The process stops when it has done type_III_limit consecutive type III moves without any simplification.
+
+In pickup mode, it also minimizes the number of crossings of strands which cross entirely above (or below) the diagram by finding the path crossing over the diagram with the least number of overcrossings (or undercrossings); this has the effect of doing “picking up” strands and putting them down elsewhere.
+
+Finally, the global mode is the combination of 2 and 3.
+
+Some examples:
+
+K = Link([(13,10,14,11), (11,5,12,4), (3,13,4,12),
+(9,14,10,1), (1,7,2,6), (2,7,3,8), (5,9,6,8)])
+K
+<Link: 1 comp; 7 cross>
+K.simplify('basic')
+True
+K
+<Link: 1 comp; 4 cross>
+K.simplify('basic')  # Already done all it can
+False
+L = Link([(5,0,6,1), (14,5,15,4), (10,2,11,3), (7,12,8,11),
+(17,0,14,9), (12,9,13,8), (3,13,4,10), (1,16,2,15), (16,6,17,7)])
+L
+<Link: 3 comp; 9 cross>
+L.simplify('basic')
+False
+L.simplify('level')
+True
+L    # Trivial unlinked component has been discarded!
+<Link: 2 comp; 2 cross>
+K = Link('K14n2345')
+K.backtrack(30)
+K.simplify('global')
+True
+split_link_diagram(destroy_original=False)
+Breaks the given link diagram into pieces, one for each connected component of the underlying 4-valent graph.
+
+L = Link([(2,1,1,2), (4,3,3,4)], check_planarity=False)
+L.split_link_diagram()
+[<Link: 1 comp; 1 cross>, <Link: 1 comp; 1 cross>]
+sublink(components)
+Returns the sublink consisting of the specified components; see the example below for the various accepted forms.
+
+Warnings: Components in the sublink that are both unknotted and unlinked may be silently thrown away. The order of the components in the sublink need not correspond to their order in the original link.
+
+L = Link('L14n64110')
+L
+<Link L14n64110: 5 comp; 14 cross>
+L.sublink([1,2,3,4])
+<Link: 4 comp; 10 cross>
+comps = L.link_components
+L.sublink([comps[0], comps[1]])
+<Link: 2 comp; 2 cross>
+If you just want one component you can do this:
+
+L11a127 = [(17,9,0,8), (7,12,8,13), (9,17,10,16), (11,3,12,2),
+(19,14,20,15), (21,4,18,5), (5,18,6,19), (15,20,16,21), (3,11,4,10),
+(1,6,2,7), (13,0,14,1)]
+L = Link(L11a127)
+L.sublink(0)
+<Link: 1 comp; 7 cross>
+L.sublink(L.link_components[1])
+<Link: 0 comp; 0 cross>
+The last answer is empty because the second component is unknotted.
+
+view(viewer=None, show_crossing_labels=False)
+Opens a Plink link viewer window displaying the current link. The strands of the links are unions of edges in the standard integer grid, following the work of Tamassia and Bridgeman et. al.
+
+white_graph()
+Return the white graph of a non-split link projection.
+
+This method generates a multigraph whose vertices correspond to the faces of the diagram, with an edge joining two vertices whenever the corresponding faces contain opposite corners at some crossing. To avoid hashability issues, the vertex corresponding to a face is the index of the face in the list returned by Link.faces().
+
+According to the conventions of “Gordon, C. McA. and Litherland, R. A, ‘On the signature of a link’, Inventiones math. 47, 23-69 (1978)”, in a checkerboard coloring of a link diagram the unbounded region is always the first white region. Of course, the choice of which region is unbounded is arbitrary; it is just a matter of which region on S^2 contains the point at infinity. In this method an equivalent arbitrary choice is made by just returning the second component of the multigraph, as determined by Graph.connected_components(). (Empirically, the second component tends to be smaller than the first.)
+
+Note that this may produce a meaningless result in the case of a split link diagram. Consequently if the diagram is split, i.e if the multigraph has more than 2 components, a ValueError is raised:
+
+sage: K=Link('5_1')
+sage: K.white_graph()
+Subgraph of (): Multi-graph on 2 vertices
+WARNING: While there is also a “black_graph” method, it need not be the case that these two graphs are complementary in the expected way.
+
+writhe()
+Finds the writhe of a knot.
+
+K = Link( [(4,1,5,2), (6,4,7,3), (8,5,1,6), (2,8,3,7)] )  # Figure 8 knot
+K.writhe()
+0
+The ClosedBraid class
+The ClosedBraid class provides an alternative way to construct links as closed braids. It is a subclass of Link, and currently defines the same methods and attributes.
+
+classspherogram.ClosedBraid(*args, **kwargs)
+This is a convenience class for constructing closed braids.
+
+The constructor accepts either a single argument, which should be a list of integers to be passed to the Link constructor as the braid_closure parameter, or one or more integer arguments which will be packaged as a list and used as the braid_closure parameter.
+
+B = ClosedBraid(1,-2,3)
+B
+ClosedBraid(1, -2, 3)
+B = ClosedBraid([1,-2,3]*3)
+B
+ClosedBraid(1, -2, 3, 1, -2, 3, 1, -2, 3)
+© Copyright 2009-2025, by Marc Culler, Nathan Dunfield, Matthias Goerner, Jeffrey Weeks and others.
+
+Built with Sphinx using a theme provided by Read the Docs.
