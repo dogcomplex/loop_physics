@@ -6,6 +6,9 @@ In simple terms, this project explores the idea that the universe is like a fabr
 
 For a more detailed explanation using analogies, see [ELI5.md](ELI5.md).
 
+This has been an ongoing conversation and collaboration with various AIs at different levels of rigor.  Not at a mathematically provable/falsifiable state yet, but a lot of interesting math coincidences. 
+[(one of the more interesting chat histories)](https://chatgpt.com/share/6802c804-cb1c-8003-ba55-92068f6256b9)
+
 ## Proposed Lepton Knots
 
 | Electron (3₁)                | Muon (5₁)                    | Tau (5₂)                     |
