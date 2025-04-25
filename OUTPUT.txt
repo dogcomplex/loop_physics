@@ -49,16 +49,16 @@ Info: Attempting spherogram.Link('3_1')
 Info: Successfully created Link object for '3_1' via Link().
 Info: Successfully created Knot object for 3_1
 Info: Identification successful via exterior() for 3_1
-Warn: Error processing identification result [] for 3_1: IndexError - list index out of range
+Info: 3_1 appears to be a catalog knot despite identify() returning empty.
 DEBUG: Attempting Morse number calculation for 3_1...
 DEBUG: Morse number calculation finished for 3_1.
+Info: Skipping HFK for 3_1 (heuristic: CatalogKnot).
 
---- Properties for Knot/Link: Unknown (3_1, NameExtractError) ---
-  (Input Identifier: 3_1)
+--- Properties for Knot/Link: 3_1 ---
   (Source: Known Atlas Knot)
-  stability_heuristic   : IdentifyError
+  stability_heuristic   : CatalogKnot
   components            : 1
-  crossing_number_min   : None
+  crossing_number_min   : 3
   signature             : 2
   determinant           : 3
   log_abs_determinant   : 1.09861
@@ -140,16 +140,16 @@ Info: Attempting spherogram.Link('5_1')
 Info: Successfully created Link object for '5_1' via Link().
 Info: Successfully created Knot object for 5_1
 Info: Identification successful via exterior() for 5_1
-Warn: Error processing identification result [] for 5_1: IndexError - list index out of range
+Info: 5_1 appears to be a catalog knot despite identify() returning empty.
 DEBUG: Attempting Morse number calculation for 5_1...
 DEBUG: Morse number calculation finished for 5_1.
+Info: Skipping HFK for 5_1 (heuristic: CatalogKnot).
 
---- Properties for Knot/Link: Unknown (5_1, NameExtractError) ---
-  (Input Identifier: 5_1)
+--- Properties for Knot/Link: 5_1 ---
   (Source: Known Atlas Knot)
-  stability_heuristic   : IdentifyError
+  stability_heuristic   : CatalogKnot
   components            : 1
-  crossing_number_min   : None
+  crossing_number_min   : 5
   signature             : 4
   determinant           : 5
   log_abs_determinant   : 1.60944
@@ -369,8 +369,7 @@ Info: Attempting spherogram.Link('7_1')
 Info: Successfully created Link object for '7_1' via Link().
 Info: Successfully created Knot object for 7_1
 Info: Identification successful via exterior() for 7_1
-Info: identify() returned empty list for 7_1. Checking if known catalog knot.
-Info: 7_1 appears to be a catalog knot despite identify() failure.
+Info: 7_1 appears to be a catalog knot despite identify() returning empty.
 DEBUG: Attempting Morse number calculation for 7_1...
 DEBUG: Morse number calculation finished for 7_1.
 Info: Skipping HFK for 7_1 (heuristic: CatalogKnot).
@@ -379,11 +378,11 @@ Info: Skipping HFK for 7_1 (heuristic: CatalogKnot).
   (Source: Known Atlas Knot)
   stability_heuristic   : CatalogKnot
   components            : 1
-  crossing_number_min   : None
+  crossing_number_min   : 7
   signature             : 6
   determinant           : 7
   log_abs_determinant   : 1.94591
-  volume                : 0.00000
+  volume                : -0.00000
   writhe                : -7
   morse_number          : 2
   is_alternating        : True
@@ -552,31 +551,31 @@ Info: Skipping HFK for 7_4 (heuristic: CompositeByIdentify).
 
 --- Analyzing Combination: 3_1 and 3_1 ---
 
---- Simulating Connected Sum: Unknown (3_1, NameExtractError) # Unknown (3_1, NameExtractError) ---
+--- Simulating Connected Sum: 3_1 # 3_1 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
     alexander_poly        : None
     components            : 1
-    crossing_number_min   : None
+    crossing_number_min   : 6
     determinant           : 9
-    input_identifier      : Unknown (3_1, NameExtractError) # Unknown (3_1, NameExtra...
+    input_identifier      : 3_1 # 3_1
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (3_1, NameExtractError) # Unknown (3_1, NameExtra...
+    knot_atlas_name       : 3_1 # 3_1
     log_abs_determinant   : 2.19722
     log_abs_jones_at_roots: {}
     signature             : 4
-    source_description    : ConnectedSum(Unknown (3_1, NameExtractError), Unknown (3_...
+    source_description    : ConnectedSum(3_1, 3_1)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (3_1, NameExtractError)) * (Unknown (3_1, NameExtractError)) ---
+--- Calculating Braid Product: (3_1) * (3_1) ---
   Combined Braid Word: (-1, -1, -1, -1, -1, -1)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -1, -1)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1).
@@ -614,7 +613,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
 
 --- Analyzing Combination: 3_1 and 4_1 ---
 
---- Simulating Connected Sum: Unknown (3_1, NameExtractError) # m004 # 4_1 # K2_1 # K4a1 # otet02_00001 ---
+--- Simulating Connected Sum: 3_1 # m004 # 4_1 # K2_1 # K4a1 # otet02_00001 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -622,23 +621,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
     components            : 1
     crossing_number_min   : None
     determinant           : 15
-    input_identifier      : Unknown (3_1, NameExtractError) # m004 # 4_1 # K2_1 # K4a...
+    input_identifier      : 3_1 # m004 # 4_1 # K2_1 # K4a1 # otet02_00001
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (3_1, NameExtractError) # m004 # 4_1 # K2_1 # K4a...
+    knot_atlas_name       : 3_1 # m004 # 4_1 # K2_1 # K4a1 # otet02_00001
     log_abs_determinant   : 2.70805
     log_abs_jones_at_roots: {}
     signature             : 2
-    source_description    : ConnectedSum(Unknown (3_1, NameExtractError), m004 # 4_1 ...
+    source_description    : ConnectedSum(3_1, m004 # 4_1 # K2_1 # K4a1 # otet02_00001)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (3_1, NameExtractError)) * (m004 # 4_1 # K2_1 # K4a1 # otet02_00001) ---
+--- Calculating Braid Product: (3_1) * (m004 # 4_1 # K2_1 # K4a1 # otet02_00001) ---
   Combined Braid Word: (-1, -1, -1, 1, -2, 1, -2)
 Info: Creating Link from Braid tuple (-1, -1, -1, 1, -2, 1, -2)
 Warn: Link identification ('identify') not available for (-1, -1, -1, 1, -2, 1, -2).
@@ -676,31 +675,31 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, 1, -2, 1, 
 
 --- Analyzing Combination: 3_1 and 5_1 ---
 
---- Simulating Connected Sum: Unknown (3_1, NameExtractError) # Unknown (5_1, NameExtractError) ---
+--- Simulating Connected Sum: 3_1 # 5_1 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
     alexander_poly        : None
     components            : 1
-    crossing_number_min   : None
+    crossing_number_min   : 8
     determinant           : 15
-    input_identifier      : Unknown (3_1, NameExtractError) # Unknown (5_1, NameExtra...
+    input_identifier      : 3_1 # 5_1
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (3_1, NameExtractError) # Unknown (5_1, NameExtra...
+    knot_atlas_name       : 3_1 # 5_1
     log_abs_determinant   : 2.70805
     log_abs_jones_at_roots: {}
     signature             : 6
-    source_description    : ConnectedSum(Unknown (3_1, NameExtractError), Unknown (5_...
+    source_description    : ConnectedSum(3_1, 5_1)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (3_1, NameExtractError)) * (Unknown (5_1, NameExtractError)) ---
+--- Calculating Braid Product: (3_1) * (5_1) ---
   Combined Braid Word: (-1, -1, -1, -1, -1, -1, -1, -1)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -1, -1, -1, -1)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1, -1, -1).
@@ -738,7 +737,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
 
 --- Analyzing Combination: 3_1 and 5_2 ---
 
---- Simulating Connected Sum: Unknown (3_1, NameExtractError) # m015 # 5_2 # K3_2 # K5a1 ---
+--- Simulating Connected Sum: 3_1 # m015 # 5_2 # K3_2 # K5a1 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -746,23 +745,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
     components            : 1
     crossing_number_min   : None
     determinant           : 21
-    input_identifier      : Unknown (3_1, NameExtractError) # m015 # 5_2 # K3_2 # K5a1
+    input_identifier      : 3_1 # m015 # 5_2 # K3_2 # K5a1
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (3_1, NameExtractError) # m015 # 5_2 # K3_2 # K5a1
+    knot_atlas_name       : 3_1 # m015 # 5_2 # K3_2 # K5a1
     log_abs_determinant   : 3.04452
     log_abs_jones_at_roots: {}
     signature             : 0
-    source_description    : ConnectedSum(Unknown (3_1, NameExtractError), m015 # 5_2 ...
+    source_description    : ConnectedSum(3_1, m015 # 5_2 # K3_2 # K5a1)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (3_1, NameExtractError)) * (m015 # 5_2 # K3_2 # K5a1) ---
+--- Calculating Braid Product: (3_1) * (m015 # 5_2 # K3_2 # K5a1) ---
   Combined Braid Word: (-1, -1, -1, -1, 2, -3, 2, 2, 1, 2, 3, 2)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, 2, -3, 2, 2, 1, 2, 3, 2)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, 2, -3, 2, 2, 1, 2, 3, 2).
@@ -800,7 +799,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, 2, -3,
 
 --- Analyzing Combination: 3_1 and 6_1 ---
 
---- Simulating Connected Sum: Unknown (3_1, NameExtractError) # m032 # 6_1 # K4_1 # K6a3 ---
+--- Simulating Connected Sum: 3_1 # m032 # 6_1 # K4_1 # K6a3 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -808,23 +807,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, 2, -3,
     components            : 1
     crossing_number_min   : None
     determinant           : 27
-    input_identifier      : Unknown (3_1, NameExtractError) # m032 # 6_1 # K4_1 # K6a3
+    input_identifier      : 3_1 # m032 # 6_1 # K4_1 # K6a3
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (3_1, NameExtractError) # m032 # 6_1 # K4_1 # K6a3
+    knot_atlas_name       : 3_1 # m032 # 6_1 # K4_1 # K6a3
     log_abs_determinant   : 3.29584
     log_abs_jones_at_roots: {}
     signature             : 2
-    source_description    : ConnectedSum(Unknown (3_1, NameExtractError), m032 # 6_1 ...
+    source_description    : ConnectedSum(3_1, m032 # 6_1 # K4_1 # K6a3)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (3_1, NameExtractError)) * (m032 # 6_1 # K4_1 # K6a3) ---
+--- Calculating Braid Product: (3_1) * (m032 # 6_1 # K4_1 # K6a3) ---
   Combined Braid Word: (-1, -1, -1, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2).
@@ -862,7 +861,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, 2, -3,
 
 --- Analyzing Combination: 3_1 and 6_2 ---
 
---- Simulating Connected Sum: Unknown (3_1, NameExtractError) # m289 # 6_2 # K5_19 # K6a2 ---
+--- Simulating Connected Sum: 3_1 # m289 # 6_2 # K5_19 # K6a2 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -870,23 +869,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, 2, -3,
     components            : 1
     crossing_number_min   : None
     determinant           : 33
-    input_identifier      : Unknown (3_1, NameExtractError) # m289 # 6_2 # K5_19 # K6a2
+    input_identifier      : 3_1 # m289 # 6_2 # K5_19 # K6a2
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (3_1, NameExtractError) # m289 # 6_2 # K5_19 # K6a2
+    knot_atlas_name       : 3_1 # m289 # 6_2 # K5_19 # K6a2
     log_abs_determinant   : 3.49651
     log_abs_jones_at_roots: {}
     signature             : 0
-    source_description    : ConnectedSum(Unknown (3_1, NameExtractError), m289 # 6_2 ...
+    source_description    : ConnectedSum(3_1, m289 # 6_2 # K5_19 # K6a2)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (3_1, NameExtractError)) * (m289 # 6_2 # K5_19 # K6a2) ---
+--- Calculating Braid Product: (3_1) * (m289 # 6_2 # K5_19 # K6a2) ---
   Combined Braid Word: (-1, -1, -1, 1, -2, 1, 1, 1, -2)
 Info: Creating Link from Braid tuple (-1, -1, -1, 1, -2, 1, 1, 1, -2)
 Warn: Link identification ('identify') not available for (-1, -1, -1, 1, -2, 1, 1, 1, -2).
@@ -924,7 +923,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, 1, -2, 1, 
 
 --- Analyzing Combination: 3_1 and 6_3 ---
 
---- Simulating Connected Sum: Unknown (3_1, NameExtractError) # s912 # 6_3 # K6_43 # K6a1 ---
+--- Simulating Connected Sum: 3_1 # s912 # 6_3 # K6_43 # K6a1 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -932,23 +931,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, 1, -2, 1, 
     components            : 1
     crossing_number_min   : None
     determinant           : 39
-    input_identifier      : Unknown (3_1, NameExtractError) # s912 # 6_3 # K6_43 # K6a1
+    input_identifier      : 3_1 # s912 # 6_3 # K6_43 # K6a1
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (3_1, NameExtractError) # s912 # 6_3 # K6_43 # K6a1
+    knot_atlas_name       : 3_1 # s912 # 6_3 # K6_43 # K6a1
     log_abs_determinant   : 3.66356
     log_abs_jones_at_roots: {}
     signature             : 2
-    source_description    : ConnectedSum(Unknown (3_1, NameExtractError), s912 # 6_3 ...
+    source_description    : ConnectedSum(3_1, s912 # 6_3 # K6_43 # K6a1)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (3_1, NameExtractError)) * (s912 # 6_3 # K6_43 # K6a1) ---
+--- Calculating Braid Product: (3_1) * (s912 # 6_3 # K6_43 # K6a1) ---
   Combined Braid Word: (-1, -1, -1, 1, -2, 1, -2, -2, 1)
 Info: Creating Link from Braid tuple (-1, -1, -1, 1, -2, 1, -2, -2, 1)
 Warn: Link identification ('identify') not available for (-1, -1, -1, 1, -2, 1, -2, -2, 1).
@@ -986,31 +985,31 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, 1, -2, 1, 
 
 --- Analyzing Combination: 3_1 and 7_1 ---
 
---- Simulating Connected Sum: Unknown (3_1, NameExtractError) # 7_1 ---
+--- Simulating Connected Sum: 3_1 # 7_1 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
     alexander_poly        : None
     components            : 1
-    crossing_number_min   : None
+    crossing_number_min   : 10
     determinant           : 21
-    input_identifier      : Unknown (3_1, NameExtractError) # 7_1
+    input_identifier      : 3_1 # 7_1
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (3_1, NameExtractError) # 7_1
+    knot_atlas_name       : 3_1 # 7_1
     log_abs_determinant   : 3.04452
     log_abs_jones_at_roots: {}
     signature             : 8
-    source_description    : ConnectedSum(Unknown (3_1, NameExtractError), 7_1)
+    source_description    : ConnectedSum(3_1, 7_1)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (3_1, NameExtractError)) * (7_1) ---
+--- Calculating Braid Product: (3_1) * (7_1) ---
   Combined Braid Word: (-1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1, -1, -1, -1, -1).
@@ -1048,7 +1047,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
 
 --- Analyzing Combination: 3_1 and 7_2 ---
 
---- Simulating Connected Sum: Unknown (3_1, NameExtractError) # m053 # 7_2 # K4_2 # K7a4 ---
+--- Simulating Connected Sum: 3_1 # m053 # 7_2 # K4_2 # K7a4 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -1056,23 +1055,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
     components            : 1
     crossing_number_min   : None
     determinant           : 33
-    input_identifier      : Unknown (3_1, NameExtractError) # m053 # 7_2 # K4_2 # K7a4
+    input_identifier      : 3_1 # m053 # 7_2 # K4_2 # K7a4
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (3_1, NameExtractError) # m053 # 7_2 # K4_2 # K7a4
+    knot_atlas_name       : 3_1 # m053 # 7_2 # K4_2 # K7a4
     log_abs_determinant   : 3.49651
     log_abs_jones_at_roots: {}
     signature             : 4
-    source_description    : ConnectedSum(Unknown (3_1, NameExtractError), m053 # 7_2 ...
+    source_description    : ConnectedSum(3_1, m053 # 7_2 # K4_2 # K7a4)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (3_1, NameExtractError)) * (m053 # 7_2 # K4_2 # K7a4) ---
+--- Calculating Braid Product: (3_1) * (m053 # 7_2 # K4_2 # K7a4) ---
   Combined Braid Word: (-1, -1, -1, -1, -2, -3, -4, -3, 2, 1, -3, -3, 4, -5, 4, -3, -2, -3, -4, -3, 5, 2)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -2, -3, -4, -3, 2, 1, -3, -3, 4, -5, 4, -3, -2, -3, -4, -3, 5, 2)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -2, -3, -4, -3, 2, 1, -3, -3, 4, -5, 4, -3, -2, -3, -4, -3, 5, 2).
@@ -1110,7 +1109,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -2, -3
 
 --- Analyzing Combination: 3_1 and 7_3 ---
 
---- Simulating Connected Sum: Unknown (3_1, NameExtractError) # m340 # 7_3 # K5_20 # K7a5 ---
+--- Simulating Connected Sum: 3_1 # m340 # 7_3 # K5_20 # K7a5 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -1118,23 +1117,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -2, -3
     components            : 1
     crossing_number_min   : None
     determinant           : 39
-    input_identifier      : Unknown (3_1, NameExtractError) # m340 # 7_3 # K5_20 # K7a5
+    input_identifier      : 3_1 # m340 # 7_3 # K5_20 # K7a5
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (3_1, NameExtractError) # m340 # 7_3 # K5_20 # K7a5
+    knot_atlas_name       : 3_1 # m340 # 7_3 # K5_20 # K7a5
     log_abs_determinant   : 3.66356
     log_abs_jones_at_roots: {}
     signature             : 6
-    source_description    : ConnectedSum(Unknown (3_1, NameExtractError), m340 # 7_3 ...
+    source_description    : ConnectedSum(3_1, m340 # 7_3 # K5_20 # K7a5)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (3_1, NameExtractError)) * (m340 # 7_3 # K5_20 # K7a5) ---
+--- Calculating Braid Product: (3_1) * (m340 # 7_3 # K5_20 # K7a5) ---
   Combined Braid Word: (-1, -1, -1, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2).
@@ -1172,7 +1171,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -2, -3
 
 --- Analyzing Combination: 3_1 and 7_4 ---
 
---- Simulating Connected Sum: Unknown (3_1, NameExtractError) # s648 # 7_4 # K6_28 # K7a6 ---
+--- Simulating Connected Sum: 3_1 # s648 # 7_4 # K6_28 # K7a6 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -1180,23 +1179,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -2, -3
     components            : 1
     crossing_number_min   : None
     determinant           : 45
-    input_identifier      : Unknown (3_1, NameExtractError) # s648 # 7_4 # K6_28 # K7a6
+    input_identifier      : 3_1 # s648 # 7_4 # K6_28 # K7a6
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (3_1, NameExtractError) # s648 # 7_4 # K6_28 # K7a6
+    knot_atlas_name       : 3_1 # s648 # 7_4 # K6_28 # K7a6
     log_abs_determinant   : 3.80666
     log_abs_jones_at_roots: {}
     signature             : 0
-    source_description    : ConnectedSum(Unknown (3_1, NameExtractError), s648 # 7_4 ...
+    source_description    : ConnectedSum(3_1, s648 # 7_4 # K6_28 # K7a6)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (3_1, NameExtractError)) * (s648 # 7_4 # K6_28 # K7a6) ---
+--- Calculating Braid Product: (3_1) * (s648 # 7_4 # K6_28 # K7a6) ---
   Combined Braid Word: (-1, -1, -1, -1, -2, 3, 4, 3, 2, 1, 3, -4, 3, 5, -4, 3, -2, 3, 4, 3, -5, 2)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -2, 3, 4, 3, 2, 1, 3, -4, 3, 5, -4, 3, -2, 3, 4, 3, -5, 2)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -2, 3, 4, 3, 2, 1, 3, -4, 3, 5, -4, 3, -2, 3, 4, 3, -5, 2).
@@ -1307,7 +1306,7 @@ Info: Attempting Knot Floer Homology for (1, -2, 1, -2, 1, -2, 1, -2)...
 
 --- Analyzing Combination: 4_1 and 5_1 ---
 
---- Simulating Connected Sum: m004 # 4_1 # K2_1 # K4a1 # otet02_00001 # Unknown (5_1, NameExtractError) ---
+--- Simulating Connected Sum: m004 # 4_1 # K2_1 # K4a1 # otet02_00001 # 5_1 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -1315,23 +1314,23 @@ Info: Attempting Knot Floer Homology for (1, -2, 1, -2, 1, -2, 1, -2)...
     components            : 1
     crossing_number_min   : None
     determinant           : 25
-    input_identifier      : m004 # 4_1 # K2_1 # K4a1 # otet02_00001 # Unknown (5_1, N...
+    input_identifier      : m004 # 4_1 # K2_1 # K4a1 # otet02_00001 # 5_1
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : m004 # 4_1 # K2_1 # K4a1 # otet02_00001 # Unknown (5_1, N...
+    knot_atlas_name       : m004 # 4_1 # K2_1 # K4a1 # otet02_00001 # 5_1
     log_abs_determinant   : 3.21888
     log_abs_jones_at_roots: {}
     signature             : 4
-    source_description    : ConnectedSum(m004 # 4_1 # K2_1 # K4a1 # otet02_00001, Unk...
+    source_description    : ConnectedSum(m004 # 4_1 # K2_1 # K4a1 # otet02_00001, 5_1)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (m004 # 4_1 # K2_1 # K4a1 # otet02_00001) * (Unknown (5_1, NameExtractError)) ---
+--- Calculating Braid Product: (m004 # 4_1 # K2_1 # K4a1 # otet02_00001) * (5_1) ---
   Combined Braid Word: (1, -2, 1, -2, -1, -1, -1, -1, -1)
 Info: Creating Link from Braid tuple (1, -2, 1, -2, -1, -1, -1, -1, -1)
 Warn: Link identification ('identify') not available for (1, -2, 1, -2, -1, -1, -1, -1, -1).
@@ -1398,43 +1397,41 @@ Warn: Link identification ('identify') not available for (1, -2, 1, -2, -1, -1, 
 Info: Creating Link from Braid tuple (1, -2, 1, -2, -1, 2, -3, 2, 2, 1, 2, 3, 2)
 Info: Successfully created Knot object for (1, -2, 1, -2, -1, 2, -3, 2, 2, 1, 2, 3, 2)
 Info: Identification successful via exterior() for (1, -2, 1, -2, -1, 2, -3, 2, 2, 1, 2, 3, 2)
-Warn: Error processing identification result [] for (1, -2, 1, -2, -1, 2, -3, 2, 2, 1, 2, 3, 2): IndexError - list index out of range
-DEBUG: Attempting Morse number calculation for (1, -2, 1, -2, -1, 2, -3, 2, 2, 1, 2, 3, 2)...
-DEBUG: Morse number calculation finished for (1, -2, 1, -2, -1, 2, -3, 2, 2, 1, 2, 3, 2).
+Info: (1, -2, 1, -2, -1, 2, -3, 2, 2, 1, 2, 3, 2) treated as Unknot based on identify() returning empty.
 
---- Properties for Knot/Link: Unknown ((1, -2, 1, -2, -1, 2, -3, 2, 2, 1, 2, 3, 2), NameExtractError) ---
+--- Properties for Knot/Link: 0_1 ---
   (Input Identifier: (1, -2, 1, -2, -1, 2, -3, 2, 2, 1, 2, 3, 2))
   (Source: Braid(1, -2, 1, -2, -1, 2, -3, 2, 2, 1, 2, 3, 2))
-  stability_heuristic   : IdentifyError
+  stability_heuristic   : Unknot
   components            : 1
-  crossing_number_min   : None
-  signature             : -2
-  determinant           : 3
-  log_abs_determinant   : 1.09861
+  crossing_number_min   : 0
+  signature             : 0
+  determinant           : 1
+  log_abs_determinant   : 0.00000
   volume                : -0.00000
-  writhe                : 5
-  morse_number          : 3
-  is_alternating        : False
-  is_chiral             : None
-  is_torus              : True
-  is_fibered            : None
+  writhe                : None
+  morse_number          : None
+  is_alternating        : True
+  is_chiral             : False
+  is_torus              : False
+  is_fibered            : True
   is_fibered_hfk        : None
   seifert_genus         : None
-  alexander_poly        : t^2 - t + 1
-  jones_poly            : q_var^2 + q_var^6 - q_var^8
-  alex_at_neg1          : 3
-  alex_at_neg2          : 7
+  alexander_poly        : 1
+  jones_poly            : 1
+  alex_at_neg1          : 1
+  alex_at_neg2          : 1
   jones_at_roots        :
     w3: 1.00000
-    w4: 3.00000
-    w5: 2.14896
+    w4: 1.00000
+    w5: 1.00000
     w6: 1.00000
   log_abs_jones_at_roots:
-    w3: -0.00000
-    w4: 1.09861
-    w5: 0.76498
-    w6: -0.00000
-  braid_word_repr       : (1, -2, 1, -2, -1, 2, -3, 2, 2, 1, 2, 3, 2)
+    w3: 0.00000
+    w4: 0.00000
+    w5: 0.00000
+    w6: 0.00000
+  braid_word_repr       : None
   --- Other Properties ---
 -----------------------------------
 ----------------------------------------
@@ -1470,43 +1467,41 @@ DEBUG: Morse number calculation finished for (1, -2, 1, -2, -1, 2, -3, 2, 2, 1, 
 Info: Creating Link from Braid tuple (1, -2, 1, -2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2)
 Info: Successfully created Knot object for (1, -2, 1, -2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2)
 Info: Identification successful via exterior() for (1, -2, 1, -2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2)
-Warn: Error processing identification result [] for (1, -2, 1, -2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2): IndexError - list index out of range
-DEBUG: Attempting Morse number calculation for (1, -2, 1, -2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2)...
-DEBUG: Morse number calculation finished for (1, -2, 1, -2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2).
+Info: (1, -2, 1, -2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2) treated as Unknot based on identify() returning empty.
 
---- Properties for Knot/Link: Unknown ((1, -2, 1, -2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2), NameExtractError) ---
+--- Properties for Knot/Link: 0_1 ---
   (Input Identifier: (1, -2, 1, -2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2))
   (Source: Braid(1, -2, 1, -2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2))
-  stability_heuristic   : IdentifyError
+  stability_heuristic   : Unknot
   components            : 1
-  crossing_number_min   : None
-  signature             : -2
-  determinant           : 3
-  log_abs_determinant   : 1.09861
+  crossing_number_min   : 0
+  signature             : 0
+  determinant           : 1
+  log_abs_determinant   : 0.00000
   volume                : -0.00000
-  writhe                : 2
-  morse_number          : 3
-  is_alternating        : False
-  is_chiral             : None
-  is_torus              : True
-  is_fibered            : None
+  writhe                : None
+  morse_number          : None
+  is_alternating        : True
+  is_chiral             : False
+  is_torus              : False
+  is_fibered            : True
   is_fibered_hfk        : None
   seifert_genus         : None
-  alexander_poly        : t^2 - t + 1
-  jones_poly            : q_var^2 + q_var^6 - q_var^8
-  alex_at_neg1          : 3
-  alex_at_neg2          : 7
+  alexander_poly        : 1
+  jones_poly            : 1
+  alex_at_neg1          : 1
+  alex_at_neg2          : 1
   jones_at_roots        :
     w3: 1.00000
-    w4: 3.00000
-    w5: 2.14896
+    w4: 1.00000
+    w5: 1.00000
     w6: 1.00000
   log_abs_jones_at_roots:
-    w3: -0.00000
-    w4: 1.09861
-    w5: 0.76498
-    w6: -0.00000
-  braid_word_repr       : (1, -2, 1, -2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2)
+    w3: 0.00000
+    w4: 0.00000
+    w5: 0.00000
+    w6: 0.00000
+  braid_word_repr       : None
   --- Other Properties ---
 -----------------------------------
 ----------------------------------------
@@ -1812,43 +1807,41 @@ Info: Attempting Knot Floer Homology for (1, -2, 1, -2, -1, -2, -3, -4, -3, 2, 1
 Info: Creating Link from Braid tuple (1, -2, 1, -2, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2)
 Info: Successfully created Knot object for (1, -2, 1, -2, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2)
 Info: Identification successful via exterior() for (1, -2, 1, -2, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2)
-Warn: Error processing identification result [] for (1, -2, 1, -2, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2): IndexError - list index out of range
-DEBUG: Attempting Morse number calculation for (1, -2, 1, -2, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2)...
-DEBUG: Morse number calculation finished for (1, -2, 1, -2, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2).
+Info: (1, -2, 1, -2, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2) treated as Unknot based on identify() returning empty.
 
---- Properties for Knot/Link: Unknown ((1, -2, 1, -2, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2), NameExtractError) ---
+--- Properties for Knot/Link: 0_1 ---
   (Input Identifier: (1, -2, 1, -2, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2))
   (Source: Braid(1, -2, 1, -2, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2))
-  stability_heuristic   : IdentifyError
+  stability_heuristic   : Unknot
   components            : 1
-  crossing_number_min   : None
-  signature             : 6
-  determinant           : 7
-  log_abs_determinant   : 1.94591
+  crossing_number_min   : 0
+  signature             : 0
+  determinant           : 1
+  log_abs_determinant   : 0.00000
   volume                : 0.00000
-  writhe                : -7
-  morse_number          : 3
-  is_alternating        : False
-  is_chiral             : None
-  is_torus              : True
-  is_fibered            : None
+  writhe                : None
+  morse_number          : None
+  is_alternating        : True
+  is_chiral             : False
+  is_torus              : False
+  is_fibered            : True
   is_fibered_hfk        : None
   seifert_genus         : None
-  alexander_poly        : t^6 - t^5 + t^4 - t^3 + t^2 - t + 1
-  jones_poly            : -q_var^-20 + q_var^-18 - q_var^-16 + q_var^-14 - q_var^-1...
-  alex_at_neg1          : 7
-  alex_at_neg2          : 127
+  alexander_poly        : 1
+  jones_poly            : 1
+  alex_at_neg1          : 1
+  alex_at_neg2          : 1
   jones_at_roots        :
     w3: 1.00000
-    w4: 7.00000
-    w5: 2.14896
+    w4: 1.00000
+    w5: 1.00000
     w6: 1.00000
   log_abs_jones_at_roots:
     w3: 0.00000
-    w4: 1.94591
-    w5: 0.76498
+    w4: 0.00000
+    w5: 0.00000
     w6: 0.00000
-  braid_word_repr       : (1, -2, 1, -2, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2)
+  braid_word_repr       : None
   --- Other Properties ---
 -----------------------------------
 ----------------------------------------
@@ -1928,31 +1921,31 @@ Info: Attempting Knot Floer Homology for (1, -2, 1, -2, -1, -2, 3, 4, 3, 2, 1, 3
 
 --- Analyzing Combination: 5_1 and 5_1 ---
 
---- Simulating Connected Sum: Unknown (5_1, NameExtractError) # Unknown (5_1, NameExtractError) ---
+--- Simulating Connected Sum: 5_1 # 5_1 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
     alexander_poly        : None
     components            : 1
-    crossing_number_min   : None
+    crossing_number_min   : 10
     determinant           : 25
-    input_identifier      : Unknown (5_1, NameExtractError) # Unknown (5_1, NameExtra...
+    input_identifier      : 5_1 # 5_1
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (5_1, NameExtractError) # Unknown (5_1, NameExtra...
+    knot_atlas_name       : 5_1 # 5_1
     log_abs_determinant   : 3.21888
     log_abs_jones_at_roots: {}
     signature             : 8
-    source_description    : ConnectedSum(Unknown (5_1, NameExtractError), Unknown (5_...
+    source_description    : ConnectedSum(5_1, 5_1)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (5_1, NameExtractError)) * (Unknown (5_1, NameExtractError)) ---
+--- Calculating Braid Product: (5_1) * (5_1) ---
   Combined Braid Word: (-1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1, -1, -1, -1, -1).
@@ -1990,7 +1983,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
 
 --- Analyzing Combination: 5_1 and 5_2 ---
 
---- Simulating Connected Sum: Unknown (5_1, NameExtractError) # m015 # 5_2 # K3_2 # K5a1 ---
+--- Simulating Connected Sum: 5_1 # m015 # 5_2 # K3_2 # K5a1 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -1998,23 +1991,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
     components            : 1
     crossing_number_min   : None
     determinant           : 35
-    input_identifier      : Unknown (5_1, NameExtractError) # m015 # 5_2 # K3_2 # K5a1
+    input_identifier      : 5_1 # m015 # 5_2 # K3_2 # K5a1
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (5_1, NameExtractError) # m015 # 5_2 # K3_2 # K5a1
+    knot_atlas_name       : 5_1 # m015 # 5_2 # K3_2 # K5a1
     log_abs_determinant   : 3.55535
     log_abs_jones_at_roots: {}
     signature             : 2
-    source_description    : ConnectedSum(Unknown (5_1, NameExtractError), m015 # 5_2 ...
+    source_description    : ConnectedSum(5_1, m015 # 5_2 # K3_2 # K5a1)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (5_1, NameExtractError)) * (m015 # 5_2 # K3_2 # K5a1) ---
+--- Calculating Braid Product: (5_1) * (m015 # 5_2 # K3_2 # K5a1) ---
   Combined Braid Word: (-1, -1, -1, -1, -1, -1, 2, -3, 2, 2, 1, 2, 3, 2)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -1, -1, 2, -3, 2, 2, 1, 2, 3, 2)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1, 2, -3, 2, 2, 1, 2, 3, 2).
@@ -2052,7 +2045,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
 
 --- Analyzing Combination: 5_1 and 6_1 ---
 
---- Simulating Connected Sum: Unknown (5_1, NameExtractError) # m032 # 6_1 # K4_1 # K6a3 ---
+--- Simulating Connected Sum: 5_1 # m032 # 6_1 # K4_1 # K6a3 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -2060,23 +2053,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
     components            : 1
     crossing_number_min   : None
     determinant           : 45
-    input_identifier      : Unknown (5_1, NameExtractError) # m032 # 6_1 # K4_1 # K6a3
+    input_identifier      : 5_1 # m032 # 6_1 # K4_1 # K6a3
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (5_1, NameExtractError) # m032 # 6_1 # K4_1 # K6a3
+    knot_atlas_name       : 5_1 # m032 # 6_1 # K4_1 # K6a3
     log_abs_determinant   : 3.80666
     log_abs_jones_at_roots: {}
     signature             : 4
-    source_description    : ConnectedSum(Unknown (5_1, NameExtractError), m032 # 6_1 ...
+    source_description    : ConnectedSum(5_1, m032 # 6_1 # K4_1 # K6a3)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (5_1, NameExtractError)) * (m032 # 6_1 # K4_1 # K6a3) ---
+--- Calculating Braid Product: (5_1) * (m032 # 6_1 # K4_1 # K6a3) ---
   Combined Braid Word: (-1, -1, -1, -1, -1, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -1, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2).
@@ -2114,7 +2107,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
 
 --- Analyzing Combination: 5_1 and 6_2 ---
 
---- Simulating Connected Sum: Unknown (5_1, NameExtractError) # m289 # 6_2 # K5_19 # K6a2 ---
+--- Simulating Connected Sum: 5_1 # m289 # 6_2 # K5_19 # K6a2 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -2122,23 +2115,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
     components            : 1
     crossing_number_min   : None
     determinant           : 55
-    input_identifier      : Unknown (5_1, NameExtractError) # m289 # 6_2 # K5_19 # K6a2
+    input_identifier      : 5_1 # m289 # 6_2 # K5_19 # K6a2
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (5_1, NameExtractError) # m289 # 6_2 # K5_19 # K6a2
+    knot_atlas_name       : 5_1 # m289 # 6_2 # K5_19 # K6a2
     log_abs_determinant   : 4.00733
     log_abs_jones_at_roots: {}
     signature             : 2
-    source_description    : ConnectedSum(Unknown (5_1, NameExtractError), m289 # 6_2 ...
+    source_description    : ConnectedSum(5_1, m289 # 6_2 # K5_19 # K6a2)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (5_1, NameExtractError)) * (m289 # 6_2 # K5_19 # K6a2) ---
+--- Calculating Braid Product: (5_1) * (m289 # 6_2 # K5_19 # K6a2) ---
   Combined Braid Word: (-1, -1, -1, -1, -1, 1, -2, 1, 1, 1, -2)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -1, 1, -2, 1, 1, 1, -2)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, 1, -2, 1, 1, 1, -2).
@@ -2176,7 +2169,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, 1,
 
 --- Analyzing Combination: 5_1 and 6_3 ---
 
---- Simulating Connected Sum: Unknown (5_1, NameExtractError) # s912 # 6_3 # K6_43 # K6a1 ---
+--- Simulating Connected Sum: 5_1 # s912 # 6_3 # K6_43 # K6a1 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -2184,23 +2177,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, 1,
     components            : 1
     crossing_number_min   : None
     determinant           : 65
-    input_identifier      : Unknown (5_1, NameExtractError) # s912 # 6_3 # K6_43 # K6a1
+    input_identifier      : 5_1 # s912 # 6_3 # K6_43 # K6a1
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (5_1, NameExtractError) # s912 # 6_3 # K6_43 # K6a1
+    knot_atlas_name       : 5_1 # s912 # 6_3 # K6_43 # K6a1
     log_abs_determinant   : 4.17439
     log_abs_jones_at_roots: {}
     signature             : 4
-    source_description    : ConnectedSum(Unknown (5_1, NameExtractError), s912 # 6_3 ...
+    source_description    : ConnectedSum(5_1, s912 # 6_3 # K6_43 # K6a1)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (5_1, NameExtractError)) * (s912 # 6_3 # K6_43 # K6a1) ---
+--- Calculating Braid Product: (5_1) * (s912 # 6_3 # K6_43 # K6a1) ---
   Combined Braid Word: (-1, -1, -1, -1, -1, 1, -2, 1, -2, -2, 1)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -1, 1, -2, 1, -2, -2, 1)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, 1, -2, 1, -2, -2, 1).
@@ -2238,31 +2231,31 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, 1,
 
 --- Analyzing Combination: 5_1 and 7_1 ---
 
---- Simulating Connected Sum: Unknown (5_1, NameExtractError) # 7_1 ---
+--- Simulating Connected Sum: 5_1 # 7_1 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
     alexander_poly        : None
     components            : 1
-    crossing_number_min   : None
+    crossing_number_min   : 12
     determinant           : 35
-    input_identifier      : Unknown (5_1, NameExtractError) # 7_1
+    input_identifier      : 5_1 # 7_1
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (5_1, NameExtractError) # 7_1
+    knot_atlas_name       : 5_1 # 7_1
     log_abs_determinant   : 3.55535
     log_abs_jones_at_roots: {}
     signature             : 10
-    source_description    : ConnectedSum(Unknown (5_1, NameExtractError), 7_1)
+    source_description    : ConnectedSum(5_1, 7_1)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (5_1, NameExtractError)) * (7_1) ---
+--- Calculating Braid Product: (5_1) * (7_1) ---
   Combined Braid Word: (-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1).
@@ -2300,7 +2293,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
 
 --- Analyzing Combination: 5_1 and 7_2 ---
 
---- Simulating Connected Sum: Unknown (5_1, NameExtractError) # m053 # 7_2 # K4_2 # K7a4 ---
+--- Simulating Connected Sum: 5_1 # m053 # 7_2 # K4_2 # K7a4 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -2308,23 +2301,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
     components            : 1
     crossing_number_min   : None
     determinant           : 55
-    input_identifier      : Unknown (5_1, NameExtractError) # m053 # 7_2 # K4_2 # K7a4
+    input_identifier      : 5_1 # m053 # 7_2 # K4_2 # K7a4
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (5_1, NameExtractError) # m053 # 7_2 # K4_2 # K7a4
+    knot_atlas_name       : 5_1 # m053 # 7_2 # K4_2 # K7a4
     log_abs_determinant   : 4.00733
     log_abs_jones_at_roots: {}
     signature             : 6
-    source_description    : ConnectedSum(Unknown (5_1, NameExtractError), m053 # 7_2 ...
+    source_description    : ConnectedSum(5_1, m053 # 7_2 # K4_2 # K7a4)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (5_1, NameExtractError)) * (m053 # 7_2 # K4_2 # K7a4) ---
+--- Calculating Braid Product: (5_1) * (m053 # 7_2 # K4_2 # K7a4) ---
   Combined Braid Word: (-1, -1, -1, -1, -1, -1, -2, -3, -4, -3, 2, 1, -3, -3, 4, -5, 4, -3, -2, -3, -4, -3, 5, 2)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -1, -1, -2, -3, -4, -3, 2, 1, -3, -3, 4, -5, 4, -3, -2, -3, -4, -3, 5, 2)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1, -2, -3, -4, -3, 2, 1, -3, -3, 4, -5, 4, -3, -2, -3, -4, -3, 5, 2).
@@ -2362,7 +2355,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
 
 --- Analyzing Combination: 5_1 and 7_3 ---
 
---- Simulating Connected Sum: Unknown (5_1, NameExtractError) # m340 # 7_3 # K5_20 # K7a5 ---
+--- Simulating Connected Sum: 5_1 # m340 # 7_3 # K5_20 # K7a5 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -2370,23 +2363,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
     components            : 1
     crossing_number_min   : None
     determinant           : 65
-    input_identifier      : Unknown (5_1, NameExtractError) # m340 # 7_3 # K5_20 # K7a5
+    input_identifier      : 5_1 # m340 # 7_3 # K5_20 # K7a5
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (5_1, NameExtractError) # m340 # 7_3 # K5_20 # K7a5
+    knot_atlas_name       : 5_1 # m340 # 7_3 # K5_20 # K7a5
     log_abs_determinant   : 4.17439
     log_abs_jones_at_roots: {}
     signature             : 8
-    source_description    : ConnectedSum(Unknown (5_1, NameExtractError), m340 # 7_3 ...
+    source_description    : ConnectedSum(5_1, m340 # 7_3 # K5_20 # K7a5)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (5_1, NameExtractError)) * (m340 # 7_3 # K5_20 # K7a5) ---
+--- Calculating Braid Product: (5_1) * (m340 # 7_3 # K5_20 # K7a5) ---
   Combined Braid Word: (-1, -1, -1, -1, -1, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -1, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1, -2, -3, -2, 1, -2, -2, -2, -2, 3, -2).
@@ -2424,7 +2417,7 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
 
 --- Analyzing Combination: 5_1 and 7_4 ---
 
---- Simulating Connected Sum: Unknown (5_1, NameExtractError) # s648 # 7_4 # K6_28 # K7a6 ---
+--- Simulating Connected Sum: 5_1 # s648 # 7_4 # K6_28 # K7a6 ---
   Resulting Properties (estimated):
     alex_at_neg1          : None
     alex_at_neg2          : None
@@ -2432,23 +2425,23 @@ Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1
     components            : 1
     crossing_number_min   : None
     determinant           : 75
-    input_identifier      : Unknown (5_1, NameExtractError) # s648 # 7_4 # K6_28 # K7a6
+    input_identifier      : 5_1 # s648 # 7_4 # K6_28 # K7a6
     is_alternating        : None
     is_chiral             : None
     is_fibered            : None
     is_torus              : False
     jones_at_roots        : {}
     jones_poly            : UNKNOWN (Non-multiplicative)
-    knot_atlas_name       : Unknown (5_1, NameExtractError) # s648 # 7_4 # K6_28 # K7a6
+    knot_atlas_name       : 5_1 # s648 # 7_4 # K6_28 # K7a6
     log_abs_determinant   : 4.31749
     log_abs_jones_at_roots: {}
     signature             : 2
-    source_description    : ConnectedSum(Unknown (5_1, NameExtractError), s648 # 7_4 ...
+    source_description    : ConnectedSum(5_1, s648 # 7_4 # K6_28 # K7a6)
     stability_heuristic   : Composite
     volume                : 0.00000
 -----------------------------------
 
---- Calculating Braid Product: (Unknown (5_1, NameExtractError)) * (s648 # 7_4 # K6_28 # K7a6) ---
+--- Calculating Braid Product: (5_1) * (s648 # 7_4 # K6_28 # K7a6) ---
   Combined Braid Word: (-1, -1, -1, -1, -1, -1, -2, 3, 4, 3, 2, 1, 3, -4, 3, 5, -4, 3, -2, 3, 4, 3, -5, 2)
 Info: Creating Link from Braid tuple (-1, -1, -1, -1, -1, -1, -2, 3, 4, 3, 2, 1, 3, -4, 3, 5, -4, 3, -2, 3, 4, 3, -5, 2)
 Warn: Link identification ('identify') not available for (-1, -1, -1, -1, -1, -1, -2, 3, 4, 3, 2, 1, 3, -4, 3, 5, -4, 3, -2, 3, 4, 3, -5, 2).
@@ -2639,43 +2632,41 @@ Warn: Link identification ('identify') not available for (-1, 2, -3, 2, 2, 1, 2,
 Info: Creating Link from Braid tuple (-1, 2, -3, 2, 2, 1, 2, 3, 2, 1, -2, 1, 1, 1, -2)
 Info: Successfully created Knot object for (-1, 2, -3, 2, 2, 1, 2, 3, 2, 1, -2, 1, 1, 1, -2)
 Info: Identification successful via exterior() for (-1, 2, -3, 2, 2, 1, 2, 3, 2, 1, -2, 1, 1, 1, -2)
-Warn: Error processing identification result [] for (-1, 2, -3, 2, 2, 1, 2, 3, 2, 1, -2, 1, 1, 1, -2): IndexError - list index out of range
-DEBUG: Attempting Morse number calculation for (-1, 2, -3, 2, 2, 1, 2, 3, 2, 1, -2, 1, 1, 1, -2)...
-DEBUG: Morse number calculation finished for (-1, 2, -3, 2, 2, 1, 2, 3, 2, 1, -2, 1, 1, 1, -2).
+Info: (-1, 2, -3, 2, 2, 1, 2, 3, 2, 1, -2, 1, 1, 1, -2) treated as Unknot based on identify() returning empty.
 
---- Properties for Knot/Link: Unknown ((-1, 2, -3, 2, 2, 1, 2, 3, 2, 1, -2, 1, 1, 1, -2), NameExtractError) ---
+--- Properties for Knot/Link: 0_1 ---
   (Input Identifier: (-1, 2, -3, 2, 2, 1, 2, 3, 2, 1, -2, 1, 1, 1, -2))
   (Source: Braid(-1, 2, -3, 2, 2, 1, 2, 3, 2, 1, -2, 1, 1, 1, -2))
-  stability_heuristic   : IdentifyError
+  stability_heuristic   : Unknot
   components            : 1
-  crossing_number_min   : None
-  signature             : -4
-  determinant           : 5
-  log_abs_determinant   : 1.60944
+  crossing_number_min   : 0
+  signature             : 0
+  determinant           : 1
+  log_abs_determinant   : 0.00000
   volume                : 0.00000
-  writhe                : 7
-  morse_number          : 3
-  is_alternating        : False
-  is_chiral             : None
-  is_torus              : True
-  is_fibered            : None
+  writhe                : None
+  morse_number          : None
+  is_alternating        : True
+  is_chiral             : False
+  is_torus              : False
+  is_fibered            : True
   is_fibered_hfk        : None
   seifert_genus         : None
-  alexander_poly        : t^4 - t^3 + t^2 - t + 1
-  jones_poly            : q_var^4 + q_var^8 - q_var^10 + q_var^12 - q_var^14
-  alex_at_neg1          : 5
-  alex_at_neg2          : 31
+  alexander_poly        : 1
+  jones_poly            : 1
+  alex_at_neg1          : 1
+  alex_at_neg2          : 1
   jones_at_roots        :
     w3: 1.00000
-    w4: 5.00000
-    w5: 2.61803
+    w4: 1.00000
+    w5: 1.00000
     w6: 1.00000
   log_abs_jones_at_roots:
-    w3: -0.00000
-    w4: 1.60944
-    w5: 0.96242
-    w6: -0.00000
-  braid_word_repr       : (-1, 2, -3, 2, 2, 1, 2, 3, 2, 1, -2, 1, 1, 1, -2)
+    w3: 0.00000
+    w4: 0.00000
+    w5: 0.00000
+    w6: 0.00000
+  braid_word_repr       : None
   --- Other Properties ---
 -----------------------------------
 ----------------------------------------
@@ -3021,43 +3012,41 @@ Warn: Link identification ('identify') not available for (-1, 2, -3, 2, 2, 1, 2,
 Info: Creating Link from Braid tuple (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2)
 Info: Successfully created Knot object for (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2)
 Info: Identification successful via exterior() for (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2)
-Warn: Error processing identification result [] for (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2): IndexError - list index out of range
-DEBUG: Attempting Morse number calculation for (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2)...
-DEBUG: Morse number calculation finished for (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2).
+Info: (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2) treated as Unknot based on identify() returning empty.
 
---- Properties for Knot/Link: Unknown ((-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2), NameExtractError) ---
+--- Properties for Knot/Link: 0_1 ---
   (Input Identifier: (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2))
   (Source: Braid(-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2))
-  stability_heuristic   : IdentifyError
+  stability_heuristic   : Unknot
   components            : 1
-  crossing_number_min   : None
-  signature             : -2
-  determinant           : 819
-  log_abs_determinant   : 6.70808
+  crossing_number_min   : 0
+  signature             : 0
+  determinant           : 1
+  log_abs_determinant   : 0.00000
   volume                : 30.57303
-  writhe                : 4
-  morse_number          : 5
-  is_alternating        : False
-  is_chiral             : None
+  writhe                : None
+  morse_number          : None
+  is_alternating        : True
+  is_chiral             : False
   is_torus              : False
-  is_fibered            : None
+  is_fibered            : True
   is_fibered_hfk        : None
   seifert_genus         : None
-  alexander_poly        : 4*t^8 - 28*t^7 + 91*t^6 - 177*t^5 + 219*t^4 - 177*t^3 + 9...
-  jones_poly            : q_var^-8 - 2*q_var^-6 - 4*q_var^-4 + 24*q_var^-2 - 55 + 9...
-  alex_at_neg1          : 819
-  alex_at_neg2          : 21440
+  alexander_poly        : 1
+  jones_poly            : 1
+  alex_at_neg1          : 1
+  alex_at_neg2          : 1
   jones_at_roots        :
     w3: 1.00000
-    w4: 819.00000
-    w5: 284.81362
+    w4: 1.00000
+    w5: 1.00000
     w6: 1.00000
   log_abs_jones_at_roots:
-    w3: -0.00000
-    w4: 6.70808
-    w5: 5.65184
-    w6: -0.00000
-  braid_word_repr       : (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, -1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2)
+    w3: 0.00000
+    w4: 0.00000
+    w5: 0.00000
+    w6: 0.00000
+  braid_word_repr       : None
   --- Other Properties ---
 -----------------------------------
 ----------------------------------------
@@ -3093,43 +3082,41 @@ DEBUG: Morse number calculation finished for (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4,
 Info: Creating Link from Braid tuple (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, 1, -2, 1, 1, 1, -2)
 Info: Successfully created Knot object for (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, 1, -2, 1, 1, 1, -2)
 Info: Identification successful via exterior() for (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, 1, -2, 1, 1, 1, -2)
-Warn: Error processing identification result [] for (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, 1, -2, 1, 1, 1, -2): IndexError - list index out of range
-DEBUG: Attempting Morse number calculation for (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, 1, -2, 1, 1, 1, -2)...
-DEBUG: Morse number calculation finished for (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, 1, -2, 1, 1, 1, -2).
+Info: (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, 1, -2, 1, 1, 1, -2) treated as Unknot based on identify() returning empty.
 
---- Properties for Knot/Link: Unknown ((-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, 1, -2, 1, 1, 1, -2), NameExtractError) ---
+--- Properties for Knot/Link: 0_1 ---
   (Input Identifier: (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, 1, -2, 1, 1, 1, -2))
   (Source: Braid(-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, 1, -2, 1, 1, 1, -2))
-  stability_heuristic   : IdentifyError
+  stability_heuristic   : Unknot
   components            : 1
-  crossing_number_min   : None
-  signature             : -4
-  determinant           : 5
-  log_abs_determinant   : 1.60944
+  crossing_number_min   : 0
+  signature             : 0
+  determinant           : 1
+  log_abs_determinant   : 0.00000
   volume                : -0.00000
-  writhe                : 4
-  morse_number          : 3
-  is_alternating        : False
-  is_chiral             : None
-  is_torus              : True
-  is_fibered            : None
+  writhe                : None
+  morse_number          : None
+  is_alternating        : True
+  is_chiral             : False
+  is_torus              : False
+  is_fibered            : True
   is_fibered_hfk        : None
   seifert_genus         : None
-  alexander_poly        : t^4 - t^3 + t^2 - t + 1
-  jones_poly            : q_var^4 + q_var^8 - q_var^10 + q_var^12 - q_var^14
-  alex_at_neg1          : 5
-  alex_at_neg2          : 31
+  alexander_poly        : 1
+  jones_poly            : 1
+  alex_at_neg1          : 1
+  alex_at_neg2          : 1
   jones_at_roots        :
     w3: 1.00000
-    w4: 5.00000
-    w5: 2.61803
+    w4: 1.00000
+    w5: 1.00000
     w6: 1.00000
   log_abs_jones_at_roots:
-    w3: -0.00000
-    w4: 1.60944
-    w5: 0.96242
-    w6: -0.00000
-  braid_word_repr       : (-1, 2, -3, 4, -3, 2, 1, -3, 2, -4, 3, 2, 1, -2, 1, 1, 1, -2)
+    w3: 0.00000
+    w4: 0.00000
+    w5: 0.00000
+    w6: 0.00000
+  braid_word_repr       : None
   --- Other Properties ---
 -----------------------------------
 ----------------------------------------
@@ -4189,7 +4176,7 @@ Warn: Link identification ('identify') not available for (1, -2, 1, -2, -2, 1, -
     alex_at_neg2          : None
     alexander_poly        : None
     components            : 1
-    crossing_number_min   : None
+    crossing_number_min   : 14
     determinant           : 49
     input_identifier      : 7_1 # 7_1
     is_alternating        : None

@@ -340,11 +340,12 @@ class KnotPropertyCalculator:
 
 
             # --- Handle Identification Results (assuming identify() returns list of Manifold objects or tuples) ---
+            # ---> START OF SECTION TO MODIFY <--- 
+            # First, handle the case where identify() might return None or empty list
             if ident_tuple_list is None: # If exterior identification failed or wasn't possible
                  print(f"Warn: Identification failed for {self.identifier}. Treating as Unknown.")
                  props['knot_atlas_name'] = f"Unknown ({self.identifier}, Identify Failed)"
-                 # Check if it looks like a simple Torus Knot Braid (like (-1,-1,-1) = 3_1)
-                 # Heuristic: Volume is zero, identifier is tuple, signature != 0
+                 # Heuristic checks for stability
                  is_zero_vol = props.get('volume') is not None and np.isclose(props['volume'], 0.0, atol=1e-6)
                  is_braid_input = isinstance(self.identifier, tuple)
                  sig_known_nonzero = props.get('signature') is not None and props.get('signature') != 0
@@ -352,27 +353,28 @@ class KnotPropertyCalculator:
                      props['stability_heuristic'] = 'PossibleTorusKnot'
                  else:
                      props['stability_heuristic'] = 'IdentifyFailed'
-
-            elif not ident_tuple_list and isinstance(self.identifier, str) and self.identifier != '3_1' and self.identifier != '5_1': 
-                 # Empty list returned by identify() - USUALLY means Unknot
-                 # But known standard knots like 3_1 and 5_1 should not be treated as unknots
-                 # even if identify() fails on them (this happens with some spherogram versions)
-                 
-                 # Only treat as unknot if not a known catalog knot 
-                 print(f"Info: identify() returned empty list for {self.identifier}. Checking if known catalog knot.")
-                 
-                 # Check if identifier matches known knot pattern (e.g., "5_2" or similar)
-                 is_known_knot = False
+            elif not ident_tuple_list: # Empty list returned
+                 # Check if it's a known catalog knot like 3_1, 5_1 that sometimes fails identify()
+                 is_known_catalog_knot = False
                  if isinstance(self.identifier, str):
-                     is_catalog_format = re.match(r'^\d+_\d+$', self.identifier) is not None
+                     # Check for patterns like '3_1', '5_2', '10_124' but explicitly exclude '0_1'
+                     is_catalog_format = re.match(r'^(?!0_1$)\d+_\d+$', self.identifier) is not None
                      if is_catalog_format:
-                         is_known_knot = True
-                         print(f"Info: {self.identifier} appears to be a catalog knot despite identify() failure.")
+                         is_known_catalog_knot = True
+                         print(f"Info: {self.identifier} appears to be a catalog knot despite identify() returning empty.")
                          props['knot_atlas_name'] = self.identifier  # Keep original name
                          props['stability_heuristic'] = 'CatalogKnot'
-                 
-                 if not is_known_knot:
-                     print(f"Info: {self.identifier} treated as Unknot based on identify() empty result.")
+                         # Attempt to extract crossing number from the identifier itself
+                         try:
+                             crossing_num = int(self.identifier.split('_')[0])
+                             if crossing_num > 0:
+                                 props['crossing_number_min'] = crossing_num
+                         except:
+                             pass # Keep None if parsing fails
+
+                 if not is_known_catalog_knot:
+                     # If not a known catalog knot, treat empty list as Unknot
+                     print(f"Info: {self.identifier} treated as Unknot based on identify() returning empty.")
                      props['knot_atlas_name'] = "0_1"
                      props['stability_heuristic'] = 'Unknot'
                      # Explicitly set/overwrite main unknot properties
@@ -400,85 +402,96 @@ class KnotPropertyCalculator:
                          props['log_abs_jones_at_roots'][name] = 0.0
 
             # --- Handle Non-empty identification results ---
-            else:
+            else: # ident_tuple_list is not None and not empty
                 try:
-                    component_names = []
-                    crossing_numbers = []
-                    valid_name_found = False
-                    primary_name = None # Store the first standard name found
-                    primary_crossing_num = None
-
-                    # Prioritize the first component's name if it's standard
+                    # Process the first component to determine primary ID
                     first_comp = ident_tuple_list[0]
                     first_comp_name = "Unknown"
                     first_crossing_num_match = None
+                    valid_name_found = False
 
                     if hasattr(first_comp, 'name'):
                         first_comp_name = first_comp.name()
-                        valid_name_found = True
-                        match = re.match(r'([LK]?)(\d+)[a-z](\d+)', first_comp_name)
-                        if match:
-                            first_crossing_num_match = int(match.group(2))
+                        # Check if the name is a standard knot format (like 3_1, 5_2, K10a140)
+                        match_std_pattern = re.match(r'^([LK]?)(\d+)[a-z](\d+)$|^(\d+)_(\d+)$|^K\d+a\d+$', first_comp_name)
+                        match_unknot = (first_comp_name == '0_1')
+                        
+                        if match_std_pattern and not match_unknot:
+                            valid_name_found = True
+                            # Extract crossing number
+                            match_cr = re.match(r'([LK]?)(\d+)[a-z](\d+)', first_comp_name) # K10a140, L10a140
+                            if match_cr:
+                                first_crossing_num_match = int(match_cr.group(2))
+                            else:
+                                match_cr = re.match(r'(\d+)_(\d+)', first_comp_name) # 5_2
+                                if match_cr:
+                                    first_crossing_num_match = int(match_cr.group(1))
+                            # Add cases for other standard names like K12a123 if needed
+                            
+                        elif match_unknot:
+                            valid_name_found = True # 0_1 is a valid identification
+                            first_crossing_num_match = 0
                         else:
-                            match = re.match(r'(\d+)_(\d+)', first_comp_name)
-                            if match:
-                                first_crossing_num_match = int(match.group(1))
+                             pass # Name is not a standard format we recognize easily
                     elif isinstance(first_comp, tuple) and len(first_comp) == 2 and isinstance(first_comp[0], int):
                         first_comp_name = f"Tuple{first_comp}"
+                        # Treat tuple as non-standard for heuristic purposes
+                        valid_name_found = False 
                         if first_comp[0] > 0: first_crossing_num_match = first_comp[0]
                     else:
-                        first_comp_name = f"UnknownType({type(first_comp).__name__})" 
+                        first_comp_name = f"UnknownType({type(first_comp).__name__})"
+                        valid_name_found = False
 
-                    # Decide based on the primary identification
-                    if valid_name_found and first_crossing_num_match is not None and first_comp_name != "0_1":
-                        # If the first result is a standard knot name (and not Unknot)
+                    # Decide heuristic based on the primary identification
+                    if valid_name_found and first_comp_name != "0_1":
+                        # First result is a standard prime knot name
                         props['knot_atlas_name'] = first_comp_name
                         props['crossing_number_min'] = first_crossing_num_match
                         props['stability_heuristic'] = 'Prime'
                         print(f"Info: Identified as Prime Knot: {first_comp_name} (using first result from identify()).")
-                    elif first_comp_name == "0_1":
+                    elif valid_name_found and first_comp_name == "0_1":
                         # Identified as unknot explicitly by the first component
                         props['knot_atlas_name'] = "0_1"
                         props['stability_heuristic'] = 'Unknot'
-                        # Re-apply essential unknot props
+                        # Re-apply essential unknot props if needed
                         props['crossing_number_min'] = 0
                         props['signature'] = 0
                         props['determinant'] = 1
                         props['volume'] = 0.0
-                        # ... potentially others ... 
+                        # ... (potentially others if needed)
                         print(f"Info: Identified as Unknot: {first_comp_name} (using first result from identify()).")
                     elif len(ident_tuple_list) > 1:
-                         # If the first wasn't a standard prime knot, AND there are multiple results,
-                         # it might be composite. List all names found.
+                         # First result wasn't standard prime/unknot, AND there are multiple results.
+                         # Treat as CompositeByIdentify and list all names.
                          all_names = []
-                         for comp in ident_tuple_list:
-                             comp_name = "Unknown"
-                             if hasattr(comp, 'name'): comp_name = comp.name()
-                             elif isinstance(comp, tuple): comp_name = f"Tuple{comp}"
-                             else: comp_name = f"UnknownType({type(comp).__name__})"
-                             all_names.append(comp_name)
-                         props['knot_atlas_name'] = " # ".join(all_names)
-                         props['stability_heuristic'] = 'CompositeByIdentify'
-                         # Attempt to sum crossing numbers if possible (best effort)
                          all_crossing_nums = []
                          for comp in ident_tuple_list:
+                             comp_name = "Unknown"
                              cn = None
-                             if hasattr(comp, 'name'):
-                                 name = comp.name()
-                                 match = re.match(r'([LK]?)(\d+)[a-z](\d+)', name) or re.match(r'(\d+)_(\d+)', name)
+                             if hasattr(comp, 'name'): 
+                                 comp_name = comp.name()
+                                 # Extract crossing number for sum (best effort)
+                                 match = re.match(r'([LK]?)(\d+)[a-z](\d+)', comp_name) or re.match(r'(\d+)_(\d+)', comp_name)
                                  if match:
-                                     group_idx = 2 if re.match(r'([LK]?)(\d+)[a-z](\d+)', name) else 1
+                                     group_idx = 2 if re.match(r'([LK]?)(\d+)[a-z](\d+)', comp_name) else 1
                                      try: cn = int(match.group(group_idx))
                                      except: pass
-                             elif isinstance(comp, tuple) and len(comp) == 2 and isinstance(comp[0], int) and comp[0] > 0:
-                                 cn = comp[0]
+                             elif isinstance(comp, tuple): 
+                                 comp_name = f"Tuple{comp}"
+                                 if len(comp)==2 and isinstance(comp[0], int) and comp[0] > 0: cn = comp[0]
+                             else: comp_name = f"UnknownType({type(comp).__name__})"
+                             all_names.append(comp_name)
                              if cn is not None: all_crossing_nums.append(cn)
+                             
+                         props['knot_atlas_name'] = " # ".join(all_names)
+                         props['stability_heuristic'] = 'CompositeByIdentify'
+                         # Set crossing number if we found one for all components
                          if len(all_crossing_nums) == len(ident_tuple_list):
                              props['crossing_number_min'] = sum(all_crossing_nums)
                          print(f"Info: Identified as Composite (potentially): {props['knot_atlas_name']}.")
                     else:
-                        # Single, non-standard, non-unknot result
-                        props['knot_atlas_name'] = f"UnknownPrime ({first_comp_name})"
+                        # Single, non-standard, non-unknot result (e.g., Tuple(-1,1), UnknownType)
+                        props['knot_atlas_name'] = f"Unknown ({first_comp_name})"
                         props['stability_heuristic'] = 'UnknownPrime'
                         # Use crossing number if found
                         if first_crossing_num_match is not None:
@@ -486,10 +499,11 @@ class KnotPropertyCalculator:
                         print(f"Info: Identified as Unknown/Non-standard: {props['knot_atlas_name']}.")
 
                 except Exception as e_name_extract:
+                    # Catch errors during the processing of non-empty list
                     print(f"Warn: Error processing identification result {ident_tuple_list} for {self.identifier}: {type(e_name_extract).__name__} - {e_name_extract}")
                     props['knot_atlas_name'] = f"Unknown ({self.identifier}, NameExtractError)"
                     props['stability_heuristic'] = 'IdentifyError'
-
+            # ---> END OF SECTION TO MODIFY <--- 
 
         except AttributeError as e_attr: # Catch attribute errors if exterior() or identify() missing
             print(f"Warn: Knot identification attribute error for {self.identifier}: {e_attr}. Status Unknown.")
