@@ -43,16 +43,6 @@ try:
         q_var = None
         T = None
         t = None
-except ImportError:
-    print("CRITICAL WARNING: Spherogram library not found. Cannot perform knot calculations.")
-    SAGE_AVAILABLE = False
-    ROOTS_OF_UNITY = {}
-    R = None
-    q_var = None
-    T = None
-    t = None
-    # Optionally exit if spherogram is essential
-    # sys.exit("Spherogram is required.")
 finally:
     if 'SAGE_AVAILABLE' not in locals():
         SAGE_AVAILABLE = False
@@ -415,54 +405,85 @@ class KnotPropertyCalculator:
                     component_names = []
                     crossing_numbers = []
                     valid_name_found = False
-                    for comp in ident_tuple_list:
-                        comp_name = "Unknown"
-                        # Try accessing name directly (SnapPy Manifold standard)
-                        if hasattr(comp, 'name'):
-                            comp_name = comp.name()
-                            valid_name_found = True # Found at least one standard name
-                            # Try extracting crossing number from name (e.g., '5_2', 'K10a140')
-                            match = re.match(r'([LK]?)(\d+)[a-z](\d+)', comp_name) # Matches K10a140 or L10a140
-                            if match:
-                                 crossing_numbers.append(int(match.group(2)))
-                            else:
-                                 match = re.match(r'(\d+)_(\d+)', comp_name) # Matches 5_2
-                                 if match:
-                                     crossing_numbers.append(int(match.group(1)))
-                        # Fallback: Check if it's the old tuple format e.g. (3,1)
-                        elif isinstance(comp, tuple) and len(comp) == 2 and isinstance(comp[0], int):
-                             comp_name = f"Tuple{comp}" # Represent as tuple string
-                             # Use tuple[0] as crossing number if positive
-                             if comp[0] > 0: crossing_numbers.append(comp[0])
+                    primary_name = None # Store the first standard name found
+                    primary_crossing_num = None
+
+                    # Prioritize the first component's name if it's standard
+                    first_comp = ident_tuple_list[0]
+                    first_comp_name = "Unknown"
+                    first_crossing_num_match = None
+
+                    if hasattr(first_comp, 'name'):
+                        first_comp_name = first_comp.name()
+                        valid_name_found = True
+                        match = re.match(r'([LK]?)(\d+)[a-z](\d+)', first_comp_name)
+                        if match:
+                            first_crossing_num_match = int(match.group(2))
                         else:
-                             comp_name = f"UnknownType({type(comp).__name__})"
+                            match = re.match(r'(\d+)_(\d+)', first_comp_name)
+                            if match:
+                                first_crossing_num_match = int(match.group(1))
+                    elif isinstance(first_comp, tuple) and len(first_comp) == 2 and isinstance(first_comp[0], int):
+                        first_comp_name = f"Tuple{first_comp}"
+                        if first_comp[0] > 0: first_crossing_num_match = first_comp[0]
+                    else:
+                        first_comp_name = f"UnknownType({type(first_comp).__name__})" 
 
-                        component_names.append(comp_name)
-
-                    # Combine names
-                    if len(component_names) == 1:
-                        props['knot_atlas_name'] = component_names[0]
-                        if props['knot_atlas_name'] == '0_1': # Identified as unknot
-                             props['stability_heuristic'] = 'Unknot'
-                             # Re-apply unknot props just in case identify() returned [Manifold('0_1')]
-                             # (Code above handles [] case, this handles explicit unknot return)
-                             props['crossing_number_min'] = 0
-                             props['signature'] = 0
-                             #... (add other essential unknot props if needed)
-                        elif valid_name_found and props['knot_atlas_name'] != "Unknown":
-                             props['stability_heuristic'] = 'Prime'
-                             # Set crossing number if found
-                             if crossing_numbers: props['crossing_number_min'] = crossing_numbers[0]
-                        else: # Name wasn't standard or failed
-                             props['stability_heuristic'] = 'UnknownPrime'
-                             props['knot_atlas_name'] = f"UnknownPrime ({component_names[0]})"
-
-                    else: # Multiple components
-                        props['knot_atlas_name'] = " # ".join(component_names)
-                        props['stability_heuristic'] = 'CompositeByIdentify'
-                        # Sum crossing numbers if available for all components
-                        if len(crossing_numbers) == len(component_names):
-                             props['crossing_number_min'] = sum(crossing_numbers)
+                    # Decide based on the primary identification
+                    if valid_name_found and first_crossing_num_match is not None and first_comp_name != "0_1":
+                        # If the first result is a standard knot name (and not Unknot)
+                        props['knot_atlas_name'] = first_comp_name
+                        props['crossing_number_min'] = first_crossing_num_match
+                        props['stability_heuristic'] = 'Prime'
+                        print(f"Info: Identified as Prime Knot: {first_comp_name} (using first result from identify()).")
+                    elif first_comp_name == "0_1":
+                        # Identified as unknot explicitly by the first component
+                        props['knot_atlas_name'] = "0_1"
+                        props['stability_heuristic'] = 'Unknot'
+                        # Re-apply essential unknot props
+                        props['crossing_number_min'] = 0
+                        props['signature'] = 0
+                        props['determinant'] = 1
+                        props['volume'] = 0.0
+                        # ... potentially others ... 
+                        print(f"Info: Identified as Unknot: {first_comp_name} (using first result from identify()).")
+                    elif len(ident_tuple_list) > 1:
+                         # If the first wasn't a standard prime knot, AND there are multiple results,
+                         # it might be composite. List all names found.
+                         all_names = []
+                         for comp in ident_tuple_list:
+                             comp_name = "Unknown"
+                             if hasattr(comp, 'name'): comp_name = comp.name()
+                             elif isinstance(comp, tuple): comp_name = f"Tuple{comp}"
+                             else: comp_name = f"UnknownType({type(comp).__name__})"
+                             all_names.append(comp_name)
+                         props['knot_atlas_name'] = " # ".join(all_names)
+                         props['stability_heuristic'] = 'CompositeByIdentify'
+                         # Attempt to sum crossing numbers if possible (best effort)
+                         all_crossing_nums = []
+                         for comp in ident_tuple_list:
+                             cn = None
+                             if hasattr(comp, 'name'):
+                                 name = comp.name()
+                                 match = re.match(r'([LK]?)(\d+)[a-z](\d+)', name) or re.match(r'(\d+)_(\d+)', name)
+                                 if match:
+                                     group_idx = 2 if re.match(r'([LK]?)(\d+)[a-z](\d+)', name) else 1
+                                     try: cn = int(match.group(group_idx))
+                                     except: pass
+                             elif isinstance(comp, tuple) and len(comp) == 2 and isinstance(comp[0], int) and comp[0] > 0:
+                                 cn = comp[0]
+                             if cn is not None: all_crossing_nums.append(cn)
+                         if len(all_crossing_nums) == len(ident_tuple_list):
+                             props['crossing_number_min'] = sum(all_crossing_nums)
+                         print(f"Info: Identified as Composite (potentially): {props['knot_atlas_name']}.")
+                    else:
+                        # Single, non-standard, non-unknot result
+                        props['knot_atlas_name'] = f"UnknownPrime ({first_comp_name})"
+                        props['stability_heuristic'] = 'UnknownPrime'
+                        # Use crossing number if found
+                        if first_crossing_num_match is not None:
+                            props['crossing_number_min'] = first_crossing_num_match
+                        print(f"Info: Identified as Unknown/Non-standard: {props['knot_atlas_name']}.")
 
                 except Exception as e_name_extract:
                     print(f"Warn: Error processing identification result {ident_tuple_list} for {self.identifier}: {type(e_name_extract).__name__} - {e_name_extract}")
