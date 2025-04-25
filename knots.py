@@ -118,11 +118,17 @@ class KnotPropertyCalculator:
                 braid_list = [int(g) for g in self.identifier] # Ensure integers
                 # Create Braid, then get its Link object
                 braid_obj = spherogram.ClosedBraid(braid_list)
-                self.link_obj = braid_obj.link()
+                # ClosedBraid is a subclass of Link, so assign it directly
+                self.link_obj = braid_obj
                 # Store the Knot object too if it's a knot
-                if self.link_obj.num_components() == 1:
-                    try: self.knot_obj = braid_obj.knot()
-                    except Exception: pass # Ignore if knot conversion fails
+                try:
+                    if self.link_obj.num_components() == 1:
+                        self.knot_obj = braid_obj # Assign the braid obj directly as the knot obj
+                    else:
+                        self.knot_obj = None
+                except Exception as e:
+                    print(f"Warn: Error checking components/assigning knot_obj for braid {self.identifier}: {e}")
+                    self.knot_obj = None
                 self.properties['knot_atlas_name'] = f"Braid{self.identifier}" # Temporary name
                 self.properties['source_description'] = f"Braid{self.identifier}"
 
@@ -549,6 +555,9 @@ class KnotPropertyCalculator:
                 props['morse_number'] = calc_obj.morse_number()
             except AttributeError: pass # Morse number method might not exist
             except ImportError: pass # May depend on external solver like GLPK
+            except KeyboardInterrupt:
+                print(f"Warn: Morse number calculation interrupted for {self.identifier}.")
+                props['morse_number'] = None # Set to None if interrupted
             except Exception as e:
                 # Avoid verbose warnings for optional calcs unless clearly an error
                 if 'GLPK' not in str(e) and 'CBC' not in str(e):
@@ -603,7 +612,7 @@ class KnotPropertyCalculator:
             'alex_at_neg1', 'alex_at_neg2', 'jones_at_roots', 'log_abs_jones_at_roots',
             # Representations
             'braid_word_repr',
-            # Placeholders
+            # Properties needing more theoretical definition / postulates
             'framing_number', 'topological_charge_Q', 'dynamic_stiffness_k', 'effective_inertia_m_eff'
         ]
 
@@ -780,6 +789,92 @@ def connected_sum(knot_calc1, knot_calc2):
     # as we lack the underlying geometric object (Link/Knot) for the sum.
     return result_props
 
+# --- Braid Multiplication --- #
+def multiply_braids(knot_calc1, knot_calc2):
+    """
+    Performs braid multiplication conceptually and calculates invariants of the result.
+    Takes two KnotPropertyCalculator objects, assumes they have braid representations,
+    concatenates their braid words, and creates a new KnotPropertyCalculator for the closure.
+    """
+    k1_name = knot_calc1.get_property('knot_atlas_name') or knot_calc1.identifier
+    k2_name = knot_calc2.get_property('knot_atlas_name') or knot_calc2.identifier
+    print(f"\n--- Calculating Braid Product: ({k1_name}) * ({k2_name}) ---")
+
+    # Get braid words
+    braid1 = knot_calc1.get_property('braid_word_repr')
+    braid2 = knot_calc2.get_property('braid_word_repr')
+
+    if braid1 is None or braid2 is None:
+        print(f"ERROR: Cannot multiply braids. Missing braid representation for {k1_name} or {k2_name}.")
+        return None
+
+    # Concatenate braid words (tuples)
+    combined_braid_word = braid1 + braid2
+
+    # Check if the combined braid is trivial (e.g., empty tuple)
+    if not combined_braid_word:
+        print("Info: Combined braid word is empty. Result is Unknot.")
+        # Return a pre-calculated unknot object if available, or create one
+        # For simplicity, create one on the fly (might duplicate calculation if 0_1 is already done)
+        return KnotPropertyCalculator('0_1', source_description=f"BraidProduct({k1_name}, {k2_name}) -> TrivialBraid")
+
+
+    print(f"  Combined Braid Word: {combined_braid_word}")
+    # Create a new KnotPropertyCalculator for the resulting closed braid
+    # The identifier IS the braid word tuple
+    try:
+        result_calculator = KnotPropertyCalculator(combined_braid_word,
+                                                   source_description=f"BraidProduct({k1_name}, {k2_name})")
+        return result_calculator
+    except Exception as e:
+        print(f"ERROR: Failed to create/analyze knot from combined braid {combined_braid_word}: {e}")
+        return None
+
+# --- Combination Analysis Function --- #
+def analyze_combinations(knot_calculators_dict):
+    """
+    Iterates through pairs of knots in the dictionary and analyzes their
+    connected sum (conceptual) and braid product (generating a new object).
+    """
+    print("\n" + "="*20 + " Analyzing Knot Combinations " + "="*20)
+    names = sorted([name for name in knot_calculators_dict if name != '0_1']) # Exclude unknot
+    analyzed_pairs = set()
+
+    for i in range(len(names)):
+        for j in range(i, len(names)): # Include self-combinations like 3_1 # 3_1
+            name1 = names[i]
+            name2 = names[j]
+
+            # Avoid duplicate pairs in reporting if order doesn't matter conceptually
+            # (though braid product IS ordered)
+            # pair = tuple(sorted((name1, name2)))
+            # if pair in analyzed_pairs: continue
+            # analyzed_pairs.add(pair)
+
+            print(f"\n--- Analyzing Combination: {name1} and {name2} ---")
+            calc1 = knot_calculators_dict[name1]
+            calc2 = knot_calculators_dict[name2]
+
+            # 1. Conceptual Connected Sum
+            connected_sum_props = connected_sum(calc1, calc2)
+            # (Reporting is handled within connected_sum)
+
+            # 2. Braid Multiplication (Order matters: calc1 * calc2)
+            braid_product_calc = multiply_braids(calc1, calc2)
+            if braid_product_calc:
+                braid_product_calc.report()
+                # Store results if needed
+                # collision_results[(name1, name2)] = braid_product_calc
+
+            # Optional: Calculate braid product in reverse order (calc2 * calc1)
+            # if name1 != name2:
+            #     print(f"\n--- Analyzing Combination: {name2} and {name1} (Reversed Braid Product) ---")
+            #     braid_product_calc_rev = multiply_braids(calc2, calc1)
+            #     if braid_product_calc_rev:
+            #         braid_product_calc_rev.report()
+
+            print("-"*40) # Separator between pairs
+
 # --- main_analysis.py ---
 # Main script to calculate properties and explore
 
@@ -809,33 +904,8 @@ if __name__ == "__main__":
         knot_calculators[name] = KnotPropertyCalculator(name, source_description="Known Atlas Knot")
         knot_calculators[name].report()
 
-    # --- Phase 2: Simulate Basic Interaction (Connected Sum) ---
-    print("\n--- PHASE 2: Simulating Interactions (Connected Sum) ---")
-    # Example: Trefoil + FigureEight
-    sum_31_41_props = None
-    if "3_1" in knot_calculators and "4_1" in knot_calculators:
-        sum_31_41_props = connected_sum(knot_calculators["3_1"], knot_calculators["4_1"])
-        # Can optionally create a dummy KnotPropertyCalculator to store these results if needed elsewhere
-        # sum_calculator = KnotPropertyCalculator(sum_31_41_props['knot_atlas_name'])
-        # sum_calculator.properties = sum_31_41_props
-        # knot_calculators[sum_31_41_props['knot_atlas_name']] = sum_calculator
-
-    # Example: Trefoil + Trefoil
-    sum_31_31_props = None
-    if "3_1" in knot_calculators:
-        sum_31_31_props = connected_sum(knot_calculators["3_1"], knot_calculators["3_1"])
-
-
-    # Example: Trefoil + its Mirror (Conceptual - needs mirror representation)
-    # To do this properly, need a way to generate the mirror knot object.
-    # Mirror changes sign of Signature, complex conjugates Jones(q).
-    # mirror_3_1 = KnotPropertyCalculator("-3_1") # Spherogram might support negative crossing notation? Check docs.
-    # if mirror_3_1.link_obj:
-    #     print("\n--- Mirror Knot Check (Conceptual) ---")
-    #     mirror_3_1.report()
-    #     # Conceptual Annihilation check: 3_1 # -3_1 should have det=1, sig=0 etc.
-    #     annihilation_props = connected_sum(knot_calculators["3_1"], mirror_3_1)
-
+    # --- Phase 2: Analyze Knot Combinations --- 
+    analyze_combinations(knot_calculators)
 
     # --- Phase 3: Data Analysis for Physics Mapping (Example) ---
     print("\n--- PHASE 3: Data Ready for Physics Correlation ---")
