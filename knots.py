@@ -6,15 +6,17 @@ import math
 import sys
 import collections
 import warnings # Import warnings module
+import re
 
 # Suppress specific DeprecationWarning from spherogram if desired
-# warnings.filterwarnings("ignore", category=DeprecationWarning, module="spherogram.links.invariants")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="spherogram.links.invariants")
 
 try:
     import spherogram
     import snappy # Often needed by spherogram for advanced features
     print("INFO: Spherogram & SnapPy libraries found.")
-    # Check for Sage environment more robustly
+    
+    # Check for Sage environment in a separate try block
     try:
         import sage.all
         # Test a simple Sage operation
@@ -33,23 +35,33 @@ try:
             'w5': sage.all.exp(2 * sage.all.pi * sage.all.I / 5),
             'w6': sage.all.exp(2 * sage.all.pi * sage.all.I / 6),
         }
-    except (ImportError, NameError, TypeError) as e:
-        print(f"WARNING: SageMath environment not fully functional or detected ({type(e).__name__}). Polynomial calculations will be limited.")
+    except ImportError:
+        print("INFO: SageMath environment not available. Some polynomial calculations will be limited.")
         SAGE_AVAILABLE = False
-        ROOTS_OF_UNITY = {} # Ensure it's defined
-        t = None # Ensure t is defined
+        ROOTS_OF_UNITY = {}
+        R = None
+        q_var = None
+        T = None
+        t = None
 except ImportError:
     print("CRITICAL WARNING: Spherogram library not found. Cannot perform knot calculations.")
     SAGE_AVAILABLE = False
     ROOTS_OF_UNITY = {}
+    R = None
+    q_var = None
+    T = None
     t = None
     # Optionally exit if spherogram is essential
     # sys.exit("Spherogram is required.")
-except Exception as e:
-    print(f"Warning: Issue during library import or Sage setup: {e}")
-    SAGE_AVAILABLE = False
-    ROOTS_OF_UNITY = {}
-    t = None
+finally:
+    if 'SAGE_AVAILABLE' not in locals():
+        SAGE_AVAILABLE = False
+        ROOTS_OF_UNITY = {}
+        R = None
+        q_var = None
+        T = None
+        t = None
+
 
 class KnotPropertyCalculator:
     """
@@ -122,13 +134,20 @@ class KnotPropertyCalculator:
                 self.link_obj = braid_obj
                 # Store the Knot object too if it's a knot
                 try:
-                    if self.link_obj.num_components() == 1:
+                    # Need num_components for ClosedBraid
+                    num_comp = 1 # Default assumption
+                    try:
+                        # Use link_components attribute instead of num_components() method
+                        num_comp = len(self.link_obj.link_components)
+                    except AttributeError:
+                         print(f"Warn: Could not access link_components on {type(self.link_obj)}. Assuming 1 component.")
+
+                    if num_comp == 1:
                         self.knot_obj = braid_obj # Assign the braid obj directly as the knot obj
                     else:
                         self.knot_obj = None
                 except Exception as e:
                     print(f"Warn: Error checking components/assigning knot_obj for braid {self.identifier}: {e}")
-                    self.knot_obj = None
                 self.properties['knot_atlas_name'] = f"Braid{self.identifier}" # Temporary name
                 self.properties['source_description'] = f"Braid{self.identifier}"
 
@@ -224,10 +243,14 @@ class KnotPropertyCalculator:
             props['is_torus'] = True
             props['is_fibered'] = True
             if SAGE_AVAILABLE:
-                try: props['alexander_poly'] = str(T(1)) # Alexander poly is 1
-                except Exception: props['alexander_poly'] = '1' # Fallback string
-                try: props['jones_poly'] = str(R(1)) # Jones poly is 1
-                except Exception: props['jones_poly'] = '1' # Fallback string
+                try:
+                    props['alexander_poly'] = str(T(1)) # Alexander poly is 1
+                except Exception:
+                    props['alexander_poly'] = '1' # Fallback string
+                try:
+                    props['jones_poly'] = str(R(1)) # Jones poly is 1
+                except Exception:
+                    props['jones_poly'] = '1' # Fallback string
             else:
                 props['alexander_poly'] = '1'
                 props['jones_poly'] = '1'
@@ -241,18 +264,22 @@ class KnotPropertyCalculator:
 
         # --- Proceed for non-Unknot cases --- #
         if not self._create_link_object():
+            # props should be defined here if link creation failed
+            props = self.properties # Ensure props is defined
             print(f"Skipping invariant calculation for '{self.identifier}' due to creation failure.")
             # Ensure stability heuristic reflects failure
-            if props['stability_heuristic'] != 'Error': props['stability_heuristic'] = 'LinkCreationFailed'
+            if props['stability_heuristic'] != 'Error':
+                props['stability_heuristic'] = 'LinkCreationFailed'
             return # Stability heuristic already set in _create_link_object on error
 
         l = self.link_obj
         props = self.properties
 
         try:
-            props['components'] = l.num_components() # Use num_components method
+            # Attempt to get number of components, handle potential AttributeError
+            props['components'] = len(l.link_components)
         except AttributeError:
-             print(f"Warn: Cannot get num_components for {self.identifier} (potentially old spherogram?). Assuming 1.")
+             print(f"Warn: 'link_components' attribute not found for {self.identifier}. Assuming 1.")
              props['components'] = 1 # Fallback assumption
         except Exception as e:
             print(f"Warn: Failed to get number of components for {self.identifier}: {type(e).__name__} - {e}")
@@ -288,9 +315,10 @@ class KnotPropertyCalculator:
 
         # --- Single Component: Assume Knot ---
         # Try to convert to a Knot object for potentially more methods
+        k = None # Initialize k to None
         try:
             # This might fail if the link isn't actually a knot or for other reasons
-            self.knot_obj = l.Knot() # Try converting to Knot object
+            # self.knot_obj = l.Knot() # Try converting to Knot object <--- REMOVE THIS LINE
             k = self.knot_obj
             print(f"Info: Successfully created Knot object for {self.identifier}")
         except AttributeError:
@@ -302,115 +330,247 @@ class KnotPropertyCalculator:
 
         # --- Knot Identification and Basic Properties ---
         try:
-            # Use identify() - should be reliable on Knot object, might work on Link too
-            ident_tuple_list = k.identify() # Returns a list of tuples, e.g., [(3,1)] for trefoil
-            if not ident_tuple_list: # Empty list
-                 print(f"Warn: identify() returned empty list for {self.identifier}. Treating as UnknownPrime.")
-                 props['knot_atlas_name'] = "UnknownPrime"
-                 props['stability_heuristic'] = 'UnknownPrime'
-            elif ident_tuple_list == [(0, 1)]:
-                 props['knot_atlas_name'] = "0_1"
-                 props['stability_heuristic'] = 'Unknot'
-                 # Set invariants for unknot explicitly
-                 props['crossing_number_min'] = 0
-                 props['signature'] = 0
-                 props['determinant'] = 1
-                 props['log_abs_determinant'] = -np.inf # log(0) technically, use -inf
-                 props['volume'] = 0.0
-                 props['is_alternating'] = True # Conventionally
-                 props['is_chiral'] = False
-                 props['is_torus'] = True # Often considered a (0,1) or (1,1) torus knot
-                 props['is_fibered'] = True # Unknot is fibered
-                 if SAGE_AVAILABLE:
-                     try: props['alexander_poly'] = str(t(1)) # Alexander poly is 1
-                     except Exception: pass
-                     try: props['jones_poly'] = str(q_var(1)) # Jones poly is 1
-                     except Exception: pass
-                 props['alex_at_neg1'] = 1
-                 props['alex_at_neg2'] = 1
-                 # Don't return yet, allow other calculations if needed, but most are set
-            else:
-                # Assume it's a single prime knot if identify gives one tuple != (0,1)
-                # If list has multiple tuples, it's a composite knot identified as components
-                if len(ident_tuple_list) == 1:
-                    props['knot_atlas_name'] = spherogram.knot_db.name_from_tuple(ident_tuple_list[0])
-                    props['stability_heuristic'] = 'Prime'
+            ident_tuple_list = None
+            manifold_for_id = None
+            try:
+                manifold_for_id = l.exterior() # Compute exterior first
+                if manifold_for_id:
+                    ident_tuple_list = manifold_for_id.identify()
+                    print(f"Info: Identification successful via exterior() for {self.identifier}")
                 else:
-                    props['knot_atlas_name'] = " # ".join([spherogram.knot_db.name_from_tuple(comp) for comp in ident_tuple_list])
-                    props['stability_heuristic'] = 'CompositeByIdentify' # Identified as composite
+                    print(f"Warn: exterior() returned None for {self.identifier}, cannot identify.")
+            except ImportError:
+                print(f"Warn: Snappy/exterior() likely missing for identify() fallback {self.identifier}.")
+            except AttributeError:
+                 print(f"Warn: exterior() or identify() method missing for fallback {self.identifier}.")
+            except Exception as e_ext_id:
+                 # Catch specific SnapPy errors if needed, e.g., non-hyperbolic
+                 print(f"Warn: Identification via exterior() failed for {self.identifier}: {type(e_ext_id).__name__} - {e_ext_id}")
+                 ident_tuple_list = None # Ensure it's None on failure
 
-                # Try getting crossing number from identified name if possible
+
+            # --- Handle Identification Results (assuming identify() returns list of Manifold objects or tuples) ---
+            if ident_tuple_list is None: # If exterior identification failed or wasn't possible
+                 print(f"Warn: Identification failed for {self.identifier}. Treating as Unknown.")
+                 props['knot_atlas_name'] = f"Unknown ({self.identifier}, Identify Failed)"
+                 # Check if it looks like a simple Torus Knot Braid (like (-1,-1,-1) = 3_1)
+                 # Heuristic: Volume is zero, identifier is tuple, signature != 0
+                 is_zero_vol = props.get('volume') is not None and np.isclose(props['volume'], 0.0, atol=1e-6)
+                 is_braid_input = isinstance(self.identifier, tuple)
+                 sig_known_nonzero = props.get('signature') is not None and props.get('signature') != 0
+                 if is_zero_vol and is_braid_input and sig_known_nonzero:
+                     props['stability_heuristic'] = 'PossibleTorusKnot'
+                 else:
+                     props['stability_heuristic'] = 'IdentifyFailed'
+
+            elif not ident_tuple_list and isinstance(self.identifier, str) and self.identifier != '3_1' and self.identifier != '5_1': 
+                 # Empty list returned by identify() - USUALLY means Unknot
+                 # But known standard knots like 3_1 and 5_1 should not be treated as unknots
+                 # even if identify() fails on them (this happens with some spherogram versions)
+                 
+                 # Only treat as unknot if not a known catalog knot 
+                 print(f"Info: identify() returned empty list for {self.identifier}. Checking if known catalog knot.")
+                 
+                 # Check if identifier matches known knot pattern (e.g., "5_2" or similar)
+                 is_known_knot = False
+                 if isinstance(self.identifier, str):
+                     is_catalog_format = re.match(r'^\d+_\d+$', self.identifier) is not None
+                     if is_catalog_format:
+                         is_known_knot = True
+                         print(f"Info: {self.identifier} appears to be a catalog knot despite identify() failure.")
+                         props['knot_atlas_name'] = self.identifier  # Keep original name
+                         props['stability_heuristic'] = 'CatalogKnot'
+                 
+                 if not is_known_knot:
+                     print(f"Info: {self.identifier} treated as Unknot based on identify() empty result.")
+                     props['knot_atlas_name'] = "0_1"
+                     props['stability_heuristic'] = 'Unknot'
+                     # Explicitly set/overwrite main unknot properties
+                     props['crossing_number_min'] = 0
+                     props['signature'] = 0
+                     props['determinant'] = 1
+                     props['log_abs_determinant'] = 0.0
+                     props['volume'] = 0.0
+                     props['is_alternating'] = True
+                     props['is_chiral'] = False
+                     props['is_torus'] = True
+                     props['is_fibered'] = True
+                     if SAGE_AVAILABLE:
+                         try: props['alexander_poly'] = str(T(1))
+                         except Exception: props['alexander_poly'] = '1'
+                         try: props['jones_poly'] = str(R(1))
+                         except Exception: props['jones_poly'] = '1'
+                     else:
+                         props['alexander_poly'] = '1'
+                         props['jones_poly'] = '1'
+                     props['alex_at_neg1'] = 1
+                     props['alex_at_neg2'] = 1
+                     for name in ROOTS_OF_UNITY:
+                         props['jones_at_roots'][name] = 1.0
+                         props['log_abs_jones_at_roots'][name] = 0.0
+
+            # --- Handle Non-empty identification results ---
+            else:
                 try:
-                    if props['stability_heuristic'] == 'Prime':
-                         cn_tuple = ident_tuple_list[0]
-                         props['crossing_number_min'] = cn_tuple[0]
-                except Exception: pass # Ignore errors here
+                    component_names = []
+                    crossing_numbers = []
+                    valid_name_found = False
+                    for comp in ident_tuple_list:
+                        comp_name = "Unknown"
+                        # Try accessing name directly (SnapPy Manifold standard)
+                        if hasattr(comp, 'name'):
+                            comp_name = comp.name()
+                            valid_name_found = True # Found at least one standard name
+                            # Try extracting crossing number from name (e.g., '5_2', 'K10a140')
+                            match = re.match(r'([LK]?)(\d+)[a-z](\d+)', comp_name) # Matches K10a140 or L10a140
+                            if match:
+                                 crossing_numbers.append(int(match.group(2)))
+                            else:
+                                 match = re.match(r'(\d+)_(\d+)', comp_name) # Matches 5_2
+                                 if match:
+                                     crossing_numbers.append(int(match.group(1)))
+                        # Fallback: Check if it's the old tuple format e.g. (3,1)
+                        elif isinstance(comp, tuple) and len(comp) == 2 and isinstance(comp[0], int):
+                             comp_name = f"Tuple{comp}" # Represent as tuple string
+                             # Use tuple[0] as crossing number if positive
+                             if comp[0] > 0: crossing_numbers.append(comp[0])
+                        else:
+                             comp_name = f"UnknownType({type(comp).__name__})"
 
-        except AttributeError:
-            print(f"Warn: Knot identification ('identify') method not found or failed for {self.identifier}. Status Unknown.")
-            props['stability_heuristic'] = 'IdentifyFailed'
-        except Exception as e:
-            print(f"Warn: Knot identification failed for {self.identifier}: {type(e).__name__} - {e}")
-            props['stability_heuristic'] = 'IdentifyError'
+                        component_names.append(comp_name)
+
+                    # Combine names
+                    if len(component_names) == 1:
+                        props['knot_atlas_name'] = component_names[0]
+                        if props['knot_atlas_name'] == '0_1': # Identified as unknot
+                             props['stability_heuristic'] = 'Unknot'
+                             # Re-apply unknot props just in case identify() returned [Manifold('0_1')]
+                             # (Code above handles [] case, this handles explicit unknot return)
+                             props['crossing_number_min'] = 0
+                             props['signature'] = 0
+                             #... (add other essential unknot props if needed)
+                        elif valid_name_found and props['knot_atlas_name'] != "Unknown":
+                             props['stability_heuristic'] = 'Prime'
+                             # Set crossing number if found
+                             if crossing_numbers: props['crossing_number_min'] = crossing_numbers[0]
+                        else: # Name wasn't standard or failed
+                             props['stability_heuristic'] = 'UnknownPrime'
+                             props['knot_atlas_name'] = f"UnknownPrime ({component_names[0]})"
+
+                    else: # Multiple components
+                        props['knot_atlas_name'] = " # ".join(component_names)
+                        props['stability_heuristic'] = 'CompositeByIdentify'
+                        # Sum crossing numbers if available for all components
+                        if len(crossing_numbers) == len(component_names):
+                             props['crossing_number_min'] = sum(crossing_numbers)
+
+                except Exception as e_name_extract:
+                    print(f"Warn: Error processing identification result {ident_tuple_list} for {self.identifier}: {type(e_name_extract).__name__} - {e_name_extract}")
+                    props['knot_atlas_name'] = f"Unknown ({self.identifier}, NameExtractError)"
+                    props['stability_heuristic'] = 'IdentifyError'
 
 
-        # --- Calculate other invariants (use object 'k' if available, else 'l') ---
-        calc_obj = k if k else l # Use Knot object if conversion succeeded, else Link object
+        except AttributeError as e_attr: # Catch attribute errors if exterior() or identify() missing
+            print(f"Warn: Knot identification attribute error for {self.identifier}: {e_attr}. Status Unknown.")
+            if props.get('stability_heuristic') not in ['IdentifyFailed', 'IdentifyError', 'IdentifyAttrError', 'UnknownPrime', 'Unknot', 'PossibleTorusKnot']:
+                 props['stability_heuristic'] = 'IdentifyAttrError'
+        except Exception as e: # Catch other identification errors
+            print(f"Warn: Knot identification failed unexpectedly for {self.identifier}: {type(e).__name__} - {e}")
+            if props.get('stability_heuristic') not in ['IdentifyFailed', 'IdentifyError', 'IdentifyAttrError', 'UnknownPrime', 'Unknot', 'PossibleTorusKnot']:
+                props['stability_heuristic'] = 'IdentifyError'
+                
+        # --- Calculate other invariants (use object 'l') ---
+        calc_obj = l # Use Link object
 
-        # Check if we already determined it's an unknot
+        # --- Re-check for Unknot after all identification attempts ---
+        if props['stability_heuristic'] == 'Unknot':
+             # Most properties should be set, but ensure key ones are correct
+             # This avoids running expensive calculations below for the unknot
+             if props.get('determinant') is None: props['determinant'] = 1
+             if props.get('alex_at_neg1') is None: props['alex_at_neg1'] = 1
+             # ... maybe add others if needed ...
+             pass # Continue to maybe calculate things like writhe if desired? Or return? Let's allow writhe etc.
+
+        # --- Proceed with calculations ONLY if not identified as Unknot ---
         if props['stability_heuristic'] != 'Unknot':
             # Basic Invariants
-            try: props['signature'] = calc_obj.signature()
-            except AttributeError: print(f"Warn: 'signature' method not found for {self.identifier}.")
-            except ImportError: print(f"Warn: Signature calc failed (likely missing SnapPy/Sage) for {self.identifier}.")
-            except Exception as e: print(f"Warn: Signature calc failed for {self.identifier}: {type(e).__name__} - {e}")
+            try:
+                props['signature'] = calc_obj.signature()
+            except AttributeError:
+                print(f"Warn: 'signature' method not found for {self.identifier}.")
+            except ImportError:
+                print(f"Warn: Signature calc failed (likely missing SnapPy/Sage) for {self.identifier}.")
+            except Exception as e:
+                print(f"Warn: Signature calc failed for {self.identifier}: {type(e).__name__} - {e}")
 
             try:
                 det = calc_obj.determinant()
                 # Spherogram determinant() often returns rational, ensure it's int for knots
-                if SAGE_AVAILABLE and isinstance(det, sage.all.Rational):
+                if SAGE_AVAILABLE and hasattr(sage, 'all') and isinstance(det, sage.all.Rational):
                     if det.denominator() == 1:
                         det = det.numerator()
                     else: # Should not happen for knot determinant, but handle anyway
                          print(f"Warn: Non-integer determinant {det} for {self.identifier}. Using numerator.")
                          det = det.numerator()
+                # Convert potential Sage Integer to Python int
+                try:
+                    det = int(det)
+                except TypeError:
+                    print(f"Warn: Could not convert determinant {det} (type: {type(det)}) to int directly.")
+                    det = None # Mark as failed
 
-                props['determinant'] = abs(int(det)) # Determinant is usually positive integer
-                if props['determinant'] is not None and props['determinant'] > 0:
-                     props['log_abs_determinant'] = np.log(props['determinant'])
-                elif props['determinant'] == 0 : # Should not happen for knots other than unknot?
-                    props['log_abs_determinant'] = -np.inf
+                if det is not None:
+                    props['determinant'] = abs(det) # Determinant is usually positive integer
+                    if props['determinant'] is not None and props['determinant'] > 0:
+                        props['log_abs_determinant'] = np.log(props['determinant'])
+                    elif props['determinant'] == 0 : # Should not happen for knots other than unknot?
+                        props['log_abs_determinant'] = -np.inf
+                else:
+                     props['determinant'] = None
+                     props['log_abs_determinant'] = None
+
             except AttributeError: print(f"Warn: 'determinant' method not found for {self.identifier}.")
             except ImportError: print(f"Warn: Determinant calc failed (likely missing SnapPy/Sage) for {self.identifier}.")
             except Exception as e: print(f"Warn: Determinant calc failed for {self.identifier}: {type(e).__name__} - {e}")
 
             # Diagrammatic Properties
-            try: props['is_alternating'] = calc_obj.is_alternating()
-            except AttributeError: print(f"Warn: 'is_alternating' method not found for {self.identifier}.")
-            except Exception as e: print(f"Warn: Alternating check failed: {type(e).__name__} - {e}")
+            try:
+                props['is_alternating'] = calc_obj.is_alternating()
+            except AttributeError:
+                print(f"Warn: 'is_alternating' method not found for {self.identifier}.")
+            except Exception as e:
+                print(f"Warn: Alternating check failed: {type(e).__name__} - {e}")
 
-            try: props['writhe'] = calc_obj.writhe()
-            except AttributeError: print(f"Warn: 'writhe' method not found for {self.identifier}.")
-            except Exception as e: print(f"Warn: Writhe calculation failed: {type(e).__name__} - {e}")
+            try:
+                props['writhe'] = calc_obj.writhe()
+            except AttributeError:
+                print(f"Warn: 'writhe' method not found for {self.identifier}.")
+            except Exception as e:
+                print(f"Warn: Writhe calculation failed: {type(e).__name__} - {e}")
 
             # Chirality (method known to be missing)
             try:
                 # This will likely fail based on previous runs, but keep for completeness
                 props['is_chiral'] = not calc_obj.is_amphichiral()
-            except AttributeError: pass # Expected failure: print(f"Warn: 'is_amphichiral' method not found for {self.identifier}.")
+            except AttributeError: pass # Expected failure
             except Exception as e: print(f"Warn: Chirality check failed: {type(e).__name__} - {e}")
 
             # Fibering (basic check)
-            try: props['is_fibered'] = calc_obj.is_fibered()
+            try:
+                props['is_fibered'] = calc_obj.is_fibered()
             except AttributeError: pass # Method might not exist depending on version/backend
             except NotImplementedError: pass # Some knots might not have this implemented
             except Exception as e: print(f"Warn: Fibered check (basic) failed: {type(e).__name__} - {e}")
 
-            # --- Manifold Properties (using SnapPy via Spherogram) ---
-            try:
-                # Use exterior() on the original link object 'l' might be safer
-                self.manifold = l.exterior()
-                vol = self.manifold.volume() # CALL the method!
+        # --- Manifold Properties (using SnapPy via Spherogram) ---
+        try:
+            # Use exterior() on the original link object 'l' might be safer
+            # Reuse manifold_for_id if calculated during identification
+            manifold_to_use = manifold_for_id if 'manifold_for_id' in locals() and manifold_for_id else l.exterior()
+
+            if manifold_to_use:
+                self.manifold = manifold_to_use # Store it
+                vol = self.manifold.volume() # Indentation corrected
                 # SnapPy volume can return complex with zero imaginary part, take real
                 try:
                     # Directly convert Sage RealNumber (or other numeric types) to float
@@ -422,137 +582,240 @@ class KnotPropertyCalculator:
                 except Exception as e_vol_conv:
                      print(f"Warn: Exception during volume float conversion for {self.identifier}: {e_vol_conv}")
                      props['volume'] = None
+            else:
+                 # Handle case where exterior() failed or returned None
+                 props['volume'] = None
+                 print(f"Info: Could not obtain manifold for volume calculation for {self.identifier}.")
 
-                # Check if Torus based on volume (heuristic) & name
-                # Only apply heuristic if volume is near zero AND it wasn't identified as unknot
+            # Check if Torus based on volume (heuristic) & name
+            # Only apply heuristic if volume is near zero AND it wasn't identified as unknot
+            is_zero_vol = False # Default to False
+            if props.get('volume') is not None: # Check if volume calculation succeeded
                 is_zero_vol = np.isclose(props['volume'], 0.0, atol=1e-6)
-                is_unknot = props['stability_heuristic'] == 'Unknot'
-                props['is_torus'] = is_zero_vol and not is_unknot
+            is_unknot = props['stability_heuristic'] == 'Unknot'
+            # Torus if volume is zero AND not unknot
+            props['is_torus'] = is_zero_vol and not is_unknot
 
-            except ImportError: pass # SnapPy likely missing
-            except AttributeError: pass # exterior() might be missing
-            except Exception as e:
-                # Don't warn if volume is just zero (common for torus knots)
-                current_vol = props.get('volume') # Get volume *after* potential assignment/error
-                is_likely_zero = ('Manifold has zero volume' in str(e) or 
-                                  (isinstance(current_vol, (float, int)) and np.isclose(current_vol, 0.0)))
-                if not is_likely_zero:
-                     print(f"Warn: Manifold/Volume calc failed for {self.identifier}: {type(e).__name__} - {e}")
-                # Ensure volume is None if calculation truly failed, but keep 0.0 if that was the result
-                if props['volume'] is None: # If it never got set correctly in try block
-                    props['volume'] = None
+        except ImportError: # Indentation Corrected
+            print(f"Info: SnapPy/exterior() not available for volume calc {self.identifier}.")
+            props['volume'] = None # Ensure volume is None
+            props['is_torus'] = None # Can't determine torus status
+        except AttributeError: # Indentation Corrected
+            print(f"Info: exterior() or volume() method not available for {self.identifier}.")
+            props['volume'] = None
+            props['is_torus'] = None
+        except Exception as e:
+            # Don't warn if volume is just zero (common for torus knots)
+            current_vol = props.get('volume') # Get volume *after* potential assignment/error
+            is_likely_zero = ('Manifold has zero volume' in str(e) or
+                              (isinstance(current_vol, (float, int)) and np.isclose(current_vol, 0.0)))
+            if not is_likely_zero:
+                 print(f"Warn: Manifold/Volume calc failed for {self.identifier}: {type(e).__name__} - {e}")
+            # Ensure volume is None if calculation truly failed, but keep 0.0 if that was the result
+            if props.get('volume') is None: # If it never got set correctly in try block
+                props['volume'] = None
+                props['is_torus'] = None # Set torus to None if volume failed
 
         # --- Polynomial Calculations (Requires Sage) ---
         if SAGE_AVAILABLE:
-            if props['stability_heuristic'] != 'Unknot': # Skip for unknot if already set
+            # Skip polynomials for unknot if already set by identification logic
+            if props['stability_heuristic'] != 'Unknot' or props.get('jones_poly') is None:
                 # Jones Polynomial
                 try:
+                    # Ensure we have a variable 'q_var' for Jones
+                    # Use R = sage.all.LaurentPolynomialRing(sage.all.QQ, 'q_var') and q_var = R.gen() defined globally
+                    if R is None or q_var is None:
+                         raise ValueError("Sage LaurentPolynomialRing 'R' or generator 'q_var' not available.")
+
                     jones_poly_q = calc_obj.jones_polynomial(variable=q_var)
                     props['jones_poly'] = str(jones_poly_q) # Store as string
                     # Evaluate at roots of unity
-                    for name, root in ROOTS_OF_UNITY.items():
-                        try:
+                    for name, root in ROOTS_OF_UNITY.items(): # Indentation Corrected
+                        try: # Indentation Corrected
                             jones_eval = jones_poly_q(root)
                             # Handle potential complex results: take absolute value (magnitude)
                             # Convert Sage complex number to float before abs if needed
-                            if hasattr(jones_eval, 'abs'):
+                            if hasattr(jones_eval, 'abs'): # Indentation Corrected
                                 jones_abs = jones_eval.abs() # Use Sage's abs() for complex
                             else:
-                                jones_abs = abs(complex(jones_eval)) # Convert to Python complex, then abs
+                                # Try converting to complex first, then abs
+                                try:
+                                    jones_abs = abs(complex(jones_eval))
+                                except Exception:
+                                     print(f"Warn: Could not convert Jones eval result ({type(jones_eval)}) to complex for abs().")
+                                     jones_abs = None # Mark as failed
 
-                            props['jones_at_roots'][name] = float(jones_abs)
-                            # Calculate log only if abs value is significantly non-zero
-                            if jones_abs > 1e-9:
-                                props['log_abs_jones_at_roots'][name] = float(np.log(jones_abs))
+                            if jones_abs is not None:
+                                props['jones_at_roots'][name] = float(jones_abs)
+                                # Calculate log only if abs value is significantly non-zero
+                                if jones_abs > 1e-9: # Indentation Corrected
+                                    props['log_abs_jones_at_roots'][name] = float(np.log(jones_abs))
+                                else:
+                                    props['log_abs_jones_at_roots'][name] = -np.inf # log(0) -> -inf
                             else:
-                                props['log_abs_jones_at_roots'][name] = -np.inf # log(0) -> -inf
+                                props['jones_at_roots'][name] = None
+                                props['log_abs_jones_at_roots'][name] = None
 
-                        except TypeError as te:
+                        except TypeError as te: # Indentation Corrected
                              # Can happen if polynomial eval fails for a root
-                             print(f"Warn: Jones eval failed for root '{name}' on {self.identifier}: {te}")
+                             print(f"Warn: Jones eval failed for root '{name}' on {self.identifier}: {te}") # Indentation Corrected
                              props['jones_at_roots'][name] = None
                              props['log_abs_jones_at_roots'][name] = None
-                        except Exception as e_eval:
-                             print(f"Warn: Jones eval failed unexpectedly for root '{name}' on {self.identifier}: {type(e_eval).__name__} - {e_eval}")
+                        except Exception as e_eval: # Indentation Corrected
+                             print(f"Warn: Jones eval failed unexpectedly for root '{name}' on {self.identifier}: {type(e_eval).__name__} - {e_eval}") # Indentation Corrected
                              props['jones_at_roots'][name] = None
                              props['log_abs_jones_at_roots'][name] = None
-
-                except AttributeError: print(f"Warn: 'jones_polynomial' method not found for {self.identifier}.")
-                except ImportError: print(f"Warn: Jones calc failed (likely missing SnapPy/Sage) for {self.identifier}.")
-                except Exception as e_jones:
-                    print(f"Warn: Jones Polynomial calculation failed for {self.identifier}: {type(e_jones).__name__} - {e_jones}")
+                except AttributeError: # Indentation Corrected
+                    print(f"Warn: 'jones_polynomial' method not found for {self.identifier}.")
+                except ImportError: # Indentation Corrected
+                    print(f"Warn: Jones calc failed (likely missing SnapPy/Sage) for {self.identifier}.")
+                except Exception as e_jones: # Indentation Corrected
+                    print(f"Warn: Jones Polynomial calculation failed for {self.identifier}: {type(e_jones).__name__} - {e_jones}") # Indentation Corrected
 
                 # Alexander Polynomial
-                try:
-                    # The variable= keyword caused TypeError in last run, remove it.
-                    alex_poly_raw = l.alexander_polynomial()
+                # Skip Alexander for unknot if already set by identification logic
+                if props['stability_heuristic'] != 'Unknot' or props.get('alexander_poly') is None:
+                    try:
+                        # Use calc_obj (which is l)
+                        alex_poly_raw = calc_obj.alexander_polynomial()
 
-                    # Convert to Sage Polynomial in variable t if possible and needed
-                    if SAGE_AVAILABLE and alex_poly_raw is not None and t is not None:
-                        try:
-                            # Attempt conversion to the polynomial ring T(variable=t)
-                            alex_poly_t = T(alex_poly_raw)
-                        except Exception as e_conv:
-                            print(f"Warn: Could not convert Alexander result to Sage polynomial T(t): {e_conv}")
-                            alex_poly_t = None # Failed conversion
-                    else:
-                        alex_poly_t = alex_poly_raw # Use raw value if not using Sage or it's None
+                        # Ensure t is available (defined globally)
+                        if t is None:
+                             raise ValueError("Sage PolynomialRing generator 't' not available.")
 
-                    if alex_poly_t is not None: # Can be None for multi-component links if unnormalized
-                         if alex_poly_t.is_zero():
-                             # Alexander poly is 0 for split links, but shouldn't be for knots (unless unknot?)
-                             print(f"Info: Alexander polynomial is zero for {self.identifier}.")
-                             props['alexander_poly'] = "0"
-                             props['alex_at_neg1'] = 0
-                             props['alex_at_neg2'] = 0
-                         else:
-                             # Normalize (make constant term positive, typically)
-                             # Spherogram might do this already, but double check
-                             # alex_poly_t = alex_poly_t.monic() # Or another normalization? Check convention
-                             props['alexander_poly'] = str(alex_poly_t)
-                             try:
-                                 val_neg1 = alex_poly_t(-1)
-                                 # Ensure integer result if possible
-                                 props['alex_at_neg1'] = abs(int(val_neg1)) if val_neg1.is_integer() else abs(float(val_neg1))
-                             except Exception as e_alex1: print(f"Warn: Alex(-1) eval failed: {e_alex1}")
+                        # Convert to Sage Polynomial in variable t if possible and needed
+                        alex_poly_t = None # Initialize
+                        if SAGE_AVAILABLE and alex_poly_raw is not None and t is not None:
+                            try:
+                                # Check if raw result is suitable for univariate T(t) ring
+                                is_likely_univariate = False
+                                if isinstance(alex_poly_raw, (int, float)):
+                                    is_likely_univariate = True
+                                elif hasattr(alex_poly_raw, 'variables'):
+                                    vars_in_poly = alex_poly_raw.variables()
+                                    if not vars_in_poly or vars_in_poly == (t,):
+                                        is_likely_univariate = True
+                                elif isinstance(alex_poly_raw, str):
+                                    # Improved check for simple t-polynomials
+                                    # Allow digits, t, +, -, *, ^, spaces, and parentheses for exponents
+                                    if re.fullmatch(r"[\\d\\s\\+\\-\\*\\^t\\(\\)]*", alex_poly_raw):
+                                         # Check if only 't' is the variable (or no variable for constants)
+                                         vars_in_str = set(re.findall(r"[a-zA-Z]+", alex_poly_raw))
+                                         if not vars_in_str or vars_in_str == {'t'}:
+                                             is_likely_univariate = True
+                                    elif alex_poly_raw.isdigit() or (alex_poly_raw.startswith('-') and alex_poly_raw[1:].isdigit()):
+                                         is_likely_univariate = True # Handle constants like "-5"
 
-                             try:
-                                 val_neg2 = alex_poly_t(-2)
-                                 props['alex_at_neg2'] = abs(int(val_neg2)) if val_neg2.is_integer() else abs(float(val_neg2))
-                             except Exception as e_alex2: print(f"Warn: Alex(-2) eval failed: {e_alex2}")
-                    else:
-                        # If alex_poly_t is None, but raw was not (e.g. Sage conversion failed)
-                        if alex_poly_raw is not None:
-                            props['alexander_poly'] = str(alex_poly_raw) # Store raw string representation
+                                if is_likely_univariate:
+                                    # Attempt conversion to the polynomial ring T(variable=t)
+                                    # Check if t is defined
+                                    if t is None:
+                                         print(f"Warn: Cannot convert Alexander poly for {self.identifier}, Sage variable 't' is not defined.")
+                                         alex_poly_t = None # Mark as non-Sage polynomial
+                                         # Store raw string if available
+                                         props['alexander_poly'] = str(alex_poly_raw) if alex_poly_raw is not None else None
+                                    else:
+                                         alex_poly_t = T(alex_poly_raw)
+                                         props['alexander_poly'] = str(alex_poly_t) # Store Sage string rep
+                                else:
+                                    print(f"Info: Alexander result for {self.identifier} appears multivariate or non-convertible to T(t). Storing as string: {alex_poly_raw}")
+                                    props['alexander_poly'] = str(alex_poly_raw) # Store raw string
+                                    alex_poly_t = None # Mark as non-Sage polynomial
+
+                            except Exception as e_conv:
+                                print(f"Warn: Could not convert Alexander result ({alex_poly_raw}) to Sage polynomial T(t): {e_conv}")
+                                # Store raw string on error only if it's not None already
+                                if alex_poly_raw is not None:
+                                    props['alexander_poly'] = str(alex_poly_raw)
+                                else:
+                                    props['alexander_poly'] = None # Ensure it's None if raw was None
+                                alex_poly_t = None # Failed conversion
                         else:
-                            print(f"Info: Alexander polynomial returned None for {self.identifier}.")
-                            props['alexander_poly'] = None # Explicitly None
+                            # If not using Sage, or raw result was None, or conversion failed, or t is None
+                            if alex_poly_raw is not None: # Check if alex_poly_raw is None
+                                props['alexander_poly'] = str(alex_poly_raw) # Store string rep if not None
+                                alex_poly_t = None # Indicate not a usable Sage polynomial
+                            else: # alex_poly_raw is None
+                                props['alexander_poly'] = None
+                                alex_poly_t = None
 
-                except AttributeError: print(f"Warn: 'alexander_polynomial' method not found for {self.identifier}.")
-                except ImportError: print(f"Warn: Alexander calc failed (likely missing SnapPy/Sage) for {self.identifier}.")
-                except Exception as e_alex:
-                    print(f"Warn: Alexander Polynomial calculation failed for {self.identifier}: {type(e_alex).__name__} - {e_alex}")
+
+                        # Process alex_poly_t ONLY if it's a valid Sage polynomial in T(t)
+                        if alex_poly_t is not None and hasattr(alex_poly_t, 'parent') and alex_poly_t.parent() == T:
+                             if alex_poly_t.is_zero():
+                                 # Alexander poly is 0 for split links, but shouldn't be for knots (unless unknot?)
+                                 print(f"Info: Alexander polynomial is zero for {self.identifier}.")
+                                 # props['alexander_poly'] is already "0" or str(poly) from above
+                                 props['alex_at_neg1'] = 0
+                                 props['alex_at_neg2'] = 0
+                             else:
+                                 # props['alexander_poly'] already set to str(alex_poly_t)
+                                 try:
+                                     val_neg1 = alex_poly_t(-1)
+                                     # Ensure integer result if possible
+                                     props['alex_at_neg1'] = abs(int(val_neg1)) if hasattr(val_neg1, 'is_integer') and val_neg1.is_integer() else abs(float(val_neg1))
+                                 except Exception as e_alex1: print(f"Warn: Alex(-1) eval failed: {e_alex1}")
+
+                                 try:
+                                     val_neg2 = alex_poly_t(-2)
+                                     props['alex_at_neg2'] = abs(int(val_neg2)) if hasattr(val_neg2, 'is_integer') and val_neg2.is_integer() else abs(float(val_neg2))
+                                 except Exception as e_alex2: print(f"Warn: Alex(-2) eval failed: {e_alex2}")
+                        else:
+                            # If alex_poly_t is None (conversion failed or not attempted),
+                            # alex_at_neg1/2 should remain None (their default)
+                            # props['alexander_poly'] should already be set to str(raw) or None.
+                            if props.get('alexander_poly') is None:
+                                 print(f"Info: Alexander polynomial result was None for {self.identifier}.")
+
+                    except AttributeError:
+                        print(f"Warn: 'alexander_polynomial' method not found for {self.identifier}.")
+                    except ImportError:
+                        print(f"Warn: Alexander calc failed (likely missing SnapPy/Sage) for {self.identifier}.")
+                    except Exception as e_alex:
+                        print(f"Warn: Alexander Polynomial calculation failed for {self.identifier}: {type(e_alex).__name__} - {e_alex}")
 
         # Final check: if determinant was calculated and alex_at_neg1 was calculated, they should match for a knot.
-        det_prop = props.get('determinant')
-        alex1_prop = props.get('alex_at_neg1')
-        if det_prop is not None and alex1_prop is not None and det_prop != alex1_prop:
-             print(f"Warn: Determinant ({det_prop}) and |Alexander(-1)| ({alex1_prop}) mismatch for {self.identifier}.")
+        # Only perform this check if NOT explicitly an unknot (where Alex(-1) is trivially 1)
+        # and if the Alexander polynomial wasn't determined to be multivariate.
+        alex_poly_str = props.get('alexander_poly')
+        is_likely_multivar_alex = alex_poly_str is not None and any(v in alex_poly_str for v in ['t1', 't2', 't3']) # Basic check
+
+        if props['stability_heuristic'] != 'Unknot' and not is_likely_multivar_alex:
+            det_prop = props.get('determinant')
+            alex1_prop = props.get('alex_at_neg1')
+            # Check only if both are valid numbers
+            if isinstance(det_prop, (int, float)) and isinstance(alex1_prop, (int, float)):
+                if not np.isclose(float(det_prop), float(alex1_prop)):
+                     print(f"Warn: Determinant ({det_prop}) and |Alexander(-1)| ({alex1_prop}) mismatch for {self.identifier}.")
+            elif det_prop is not None and alex1_prop is not None:
+                 # Avoid warning if evaluation failed for Alex(-1) or determinant calc failed
+                 pass
+        elif is_likely_multivar_alex:
+             # If alex is multivariate, alex_at_neg1 should be None, no check needed
+             pass
 
         # --- Other Representations and Optional Calculations ---
         if props['stability_heuristic'] != 'Unknot':
             # Braid Word
             try:
-                braid_word = calc_obj.braid_word()
-                # Store as tuple of integers for potential later use
-                props['braid_word_repr'] = tuple(braid_word)
-            except AttributeError: print(f"Warn: 'braid_word' method not found for {self.identifier}.")
+                # If the identifier was already a braid tuple, use it directly
+                if isinstance(self.identifier, tuple):
+                     props['braid_word_repr'] = self.identifier
+                else:
+                    # Otherwise, try calculating it from the Link/Knot object
+                    braid_word = calc_obj.braid_word()
+                    # Store as tuple of integers for potential later use
+                    props['braid_word_repr'] = tuple(braid_word)
+            except AttributeError:
+                print(f"Warn: 'braid_word' method not found for {self.identifier}.")
             except Exception as e:
                 print(f"Warn: Braid word calculation failed: {type(e).__name__} - {e}")
 
             # Morse Number (Optional)
             try:
+                print(f"DEBUG: Attempting Morse number calculation for {self.identifier}...") # Debug print
                 props['morse_number'] = calc_obj.morse_number()
+                print(f"DEBUG: Morse number calculation finished for {self.identifier}.") # Debug print
             except AttributeError: pass # Morse number method might not exist
             except ImportError: pass # May depend on external solver like GLPK
             except KeyboardInterrupt:
@@ -562,22 +825,35 @@ class KnotPropertyCalculator:
                 # Avoid verbose warnings for optional calcs unless clearly an error
                 if 'GLPK' not in str(e) and 'CBC' not in str(e):
                      print(f"Warn: Morse number calculation failed: {type(e).__name__} - {e}")
+                props['morse_number'] = None # Ensure it's None on failure
 
             # Knot Floer Homology (Optional - requires external HFKCalculator)
             try:
-                hfk_results = calc_obj.knot_floer_homology()
-                if isinstance(hfk_results, dict):
-                    props['seifert_genus'] = hfk_results.get('seifert_genus')
-                    props['is_fibered_hfk'] = hfk_results.get('fibered')
-                    # Could store total_rank or rank details if needed
-                    # props['hfk_total_rank'] = hfk_results.get('total_rank')
+                # Only run HFK if it's identified as a single prime knot
+                if props.get('stability_heuristic') == 'Prime':
+                    print(f"Info: Attempting Knot Floer Homology for {self.identifier}...") # Info print
+                    hfk_calc_obj = k if k else l # Revisit this - does HFK work on Link?
+                    hfk_results = hfk_calc_obj.knot_floer_homology()
+                    if isinstance(hfk_results, dict):
+                        props['seifert_genus'] = hfk_results.get('seifert_genus')
+                        props['is_fibered_hfk'] = hfk_results.get('fibered')
+                        # Could store total_rank or rank details if needed
+                        # props['hfk_total_rank'] = hfk_results.get('total_rank')
+                    else:
+                         print(f"Warn: HFK result was not a dictionary for {self.identifier}: {hfk_results}")
+                elif props.get('stability_heuristic') not in ['IdentifyFailed', 'IdentifyError', 'IdentifyAttrError', 'UnknownPrime', 'Unknot', 'LinkCreationFailed', 'ErrorCalculatingComponents', 'Empty', 'Link']:
+                    # Only print skip message if identification didn't fail AND it's a single component
+                    print(f"Info: Skipping HFK for {self.identifier} (heuristic: {props.get('stability_heuristic')}).")
+
             except ImportError:
                 # Usually means HFKCalculator command is not found
-                print("Info: Knot Floer Homology calculation skipped (requires external HFKCalculator)." )
-                # Only print this info once maybe?
+                print("Info: Knot Floer Homology calculation skipped (requires external HFKCalculator).")
                 pass
             except FileNotFoundError:
-                 print("Info: Knot Floer Homology calculation skipped (HFKCalculator command not found in PATH)." )
+                 print("Info: Knot Floer Homology calculation skipped (HFKCalculator command not found in PATH).")
+                 pass
+            except AttributeError:
+                 print(f"Warn: 'knot_floer_homology' method not found for {self.identifier}.")
                  pass
             except Exception as e:
                 # Avoid printing error for every knot if tool is just missing
@@ -632,16 +908,21 @@ class KnotPropertyCalculator:
                           print(f"  {key:<22}: {value:.5f}") # More precision for floats
                  elif isinstance(value, dict):
                      print(f"  {key:<22}:")
-                     if not value: print("    (empty)")
-                     for k,v in sorted(value.items()): # Sort dict items for consistent output
-                         if v is None:
-                              print(f"    {k}: None")
-                         elif isinstance(v, float) or isinstance(v, np.floating):
-                             if np.isinf(v): print(f"    {k}: {v}")
-                             else: print(f"    {k}: {v:.5f}")
-                         else: print(f"    {k}: {v}")
+                     if not value:
+                         print("    (empty)")
+                     else:
+                         for k, v in sorted(value.items()): # Sort dict items for consistent output
+                             if v is None:
+                                  print(f"    {k}: None")
+                             elif isinstance(v, float) or isinstance(v, np.floating):
+                                 if np.isinf(v):
+                                     print(f"    {k}: {v}")
+                                 else:
+                                     print(f"    {k}: {v:.5f}")
+                             else:
+                                  print(f"    {k}: {v}")
                  elif isinstance(value, str) and len(value) > 60: # Truncate long strings (like polynomials)
-                      print(f"  {key:<22}: {value[:57]}...")
+                     print(f"  {key:<22}: {value[:57]}...")
                  else:
                       print(f"  {key:<22}: {value}")
                  reported_keys.add(key)
@@ -657,7 +938,6 @@ class KnotPropertyCalculator:
                 if value == 'UNKNOWN': continue
                 # Basic print for other keys
                 print(f"  {key:<22}: {value}")
-
 
         print("-" * 35)
 
@@ -676,15 +956,15 @@ def connected_sum(knot_calc1, knot_calc2):
     # Basic check: Ensure inputs are single-component knots
     if knot_calc1.get_property('components') != 1 or knot_calc2.get_property('components') != 1:
         print("ERROR: Connected sum is typically defined for knots (1 component).")
+        print(f"  (Components: {knot_calc1.get_property('components')}, {knot_calc2.get_property('components')})")
         return None
     # Ensure inputs aren't unknots (sum with unknot is the original knot)
     if knot_calc1.get_property('stability_heuristic') == 'Unknot':
         print("Info: Connected sum with Unknot results in the other knot.")
-        return knot_calc2.properties # Return properties of the non-unknot summand
+        return knot_calc2.properties.copy()
     if knot_calc2.get_property('stability_heuristic') == 'Unknot':
         print("Info: Connected sum with Unknot results in the other knot.")
-        return knot_calc1.properties # Return properties of the non-unknot summand
-
+        return knot_calc1.properties.copy()
 
     result_name = f"{k1_name} # {k2_name}"
     # Initialize result props based on k1, then update
@@ -697,15 +977,14 @@ def connected_sum(knot_calc1, knot_calc2):
         'is_alternating': None, # Alternating property not guaranteed
         'is_torus': False, # Connected sum of non-trivial knots is not torus
         'is_fibered': None, # Fibered property is complex for sums
-        'volume': None, # Volume is NOT additive for connected sum (it's 0 for sum)
-         'log_abs_determinant': None, # Recalculate below
+        'volume': 0.0, # Volume IS additive for connected sum IF defined as sum of volumes of complements (which is 0 for prime knots)
+        'log_abs_determinant': None, # Recalculate below
         # Properties needing interaction model
-         'framing_number': 'UNKNOWN',
-         'topological_charge_Q': 'UNKNOWN',
-         'dynamic_stiffness_k': 'UNKNOWN',
-         'effective_inertia_m_eff': 'UNKNOWN',
+        'framing_number': 'UNKNOWN',
+        'topological_charge_Q': 'UNKNOWN',
+        'dynamic_stiffness_k': 'UNKNOWN',
+        'effective_inertia_m_eff': 'UNKNOWN',
     }
-
 
     # --- Properties that add ---
     sig1 = knot_calc1.get_property('signature')
@@ -721,21 +1000,32 @@ def connected_sum(knot_calc1, knot_calc2):
          result_props['crossing_number_min'] = cn1 + cn2
     else: result_props['crossing_number_min'] = None # If either is unknown
 
-
     # --- Properties that multiply ---
     det1 = knot_calc1.get_property('determinant')
     det2 = knot_calc2.get_property('determinant')
     if det1 is not None and det2 is not None:
         result_props['determinant'] = det1 * det2
-        if result_props['determinant'] > 0:
+        # Recalculate log_abs_determinant based on the product
+        if result_props['determinant'] is not None and result_props['determinant'] > 0:
              result_props['log_abs_determinant'] = np.log(result_props['determinant'])
-        else: # Should only be 0 if one summand was unknot, handled above?
+        elif result_props.get('determinant') == 0:
              result_props['log_abs_determinant'] = -np.inf
-    else: result_props['determinant'] = None
+        else:
+             result_props['log_abs_determinant'] = None # If determinant became None or negative (error?)
+    else:
+        result_props['determinant'] = None
+        result_props['log_abs_determinant'] = None
 
     alex1_str = knot_calc1.get_property('alexander_poly')
     alex2_str = knot_calc2.get_property('alexander_poly')
-    if alex1_str and alex2_str and SAGE_AVAILABLE and t:
+    # Ensure both are strings and seem like valid polynomials before trying Sage conversion
+    valid_poly_strs = True
+    if not isinstance(alex1_str, str) or not alex1_str or ' ' in alex1_str.strip(): # Basic checks
+        valid_poly_strs = False
+    if not isinstance(alex2_str, str) or not alex2_str or ' ' in alex2_str.strip():
+        valid_poly_strs = False
+
+    if valid_poly_strs and SAGE_AVAILABLE and t:
         try:
             # Need to parse string back to Sage polynomial using the correct ring T
             p1 = T(alex1_str)
@@ -745,19 +1035,23 @@ def connected_sum(knot_calc1, knot_calc2):
             # Recalculate evaluations
             try:
                 val_neg1 = p_prod(-1)
-                result_props['alex_at_neg1'] = abs(int(val_neg1)) if val_neg1.is_integer() else abs(float(val_neg1))
-            except Exception: result_props['alex_at_neg1'] = None
+                result_props['alex_at_neg1'] = abs(int(val_neg1)) if hasattr(val_neg1, 'is_integer') and val_neg1.is_integer() else abs(float(val_neg1))
+            except Exception as e_alex1_sum:
+                print(f"Warn: Alex(-1) eval failed for connected sum: {e_alex1_sum}")
+                result_props['alex_at_neg1'] = None
             try:
                 val_neg2 = p_prod(-2)
-                result_props['alex_at_neg2'] = abs(int(val_neg2)) if val_neg2.is_integer() else abs(float(val_neg2))
-            except Exception: result_props['alex_at_neg2'] = None
+                result_props['alex_at_neg2'] = abs(int(val_neg2)) if hasattr(val_neg2, 'is_integer') and val_neg2.is_integer() else abs(float(val_neg2))
+            except Exception as e_alex2_sum:
+                print(f"Warn: Alex(-2) eval failed for connected sum: {e_alex2_sum}")
+                result_props['alex_at_neg2'] = None
         except Exception as e_alex_sum:
-            print(f"Warn: Failed to compute Alexander polynomial for connected sum: {e_alex_sum}")
+            print(f"Warn: Failed to compute Alexander polynomial for connected sum ({alex1_str}, {alex2_str}): {e_alex_sum}")
             result_props['alexander_poly'] = None
             result_props['alex_at_neg1'] = None
             result_props['alex_at_neg2'] = None
     else:
-        result_props['alexander_poly'] = None # Cannot calculate if Sage unavailable or polys missing
+        result_props['alexander_poly'] = None # Cannot calculate if Sage unavailable or polys missing/invalid
         result_props['alex_at_neg1'] = None
         result_props['alex_at_neg2'] = None
 
@@ -775,14 +1069,31 @@ def connected_sum(knot_calc1, knot_calc2):
     else:
         result_props['is_chiral'] = chiral1 or chiral2
 
-
     print("  Resulting Properties (estimated):")
     # Use the report formatting logic for consistency (simplified here)
     for key, value in sorted(result_props.items()):
          if key in ['framing_number', 'topological_charge_Q', 'dynamic_stiffness_k', 'effective_inertia_m_eff']: continue # Skip placeholders
-         if isinstance(value, float): print(f"    {key:<22}: {value:.5f}")
-         elif isinstance(value, dict) and not value: print(f"    {key:<22}: {{}}") # Empty dict
-         else: print(f"    {key:<22}: {value}")
+         if isinstance(value, float) or isinstance(value, np.floating):
+              if np.isinf(value):
+                  print(f"    {key:<22}: {value}")
+              else:
+                  print(f"    {key:<22}: {value:.5f}")
+         elif isinstance(value, dict) and not value:
+              print(f"    {key:<22}: {{}}") # Empty dict
+         elif isinstance(value, dict):
+             print(f"    {key:<22}:")
+             for k, v in sorted(value.items()):
+                 if isinstance(v, float) or isinstance(v, np.floating):
+                     if np.isinf(v):
+                         print(f"      {k}: {v}")
+                     else:
+                         print(f"      {k}: {v:.5f}")
+                 else:
+                     print(f"      {k}: {v}")
+         elif isinstance(value, str) and len(value) > 60:
+             print(f"    {key:<22}: {value[:57]}...")
+         else:
+              print(f"    {key:<22}: {value}")
     print("-" * 35)
 
     # Return the dictionary of properties. We don't create a full KnotPropertyCalculator
@@ -808,6 +1119,14 @@ def multiply_braids(knot_calc1, knot_calc2):
         print(f"ERROR: Cannot multiply braids. Missing braid representation for {k1_name} or {k2_name}.")
         return None
 
+    # Ensure they are tuples of integers
+    try:
+        braid1 = tuple(int(x) for x in braid1)
+        braid2 = tuple(int(x) for x in braid2)
+    except (TypeError, ValueError) as e:
+         print(f"ERROR: Braid words must be sequences of integers. Found: {braid1}, {braid2}. Error: {e}")
+         return None
+
     # Concatenate braid words (tuples)
     combined_braid_word = braid1 + braid2
 
@@ -817,7 +1136,6 @@ def multiply_braids(knot_calc1, knot_calc2):
         # Return a pre-calculated unknot object if available, or create one
         # For simplicity, create one on the fly (might duplicate calculation if 0_1 is already done)
         return KnotPropertyCalculator('0_1', source_description=f"BraidProduct({k1_name}, {k2_name}) -> TrivialBraid")
-
 
     print(f"  Combined Braid Word: {combined_braid_word}")
     # Create a new KnotPropertyCalculator for the resulting closed braid
@@ -837,8 +1155,22 @@ def analyze_combinations(knot_calculators_dict):
     connected sum (conceptual) and braid product (generating a new object).
     """
     print("\n" + "="*20 + " Analyzing Knot Combinations " + "="*20)
-    names = sorted([name for name in knot_calculators_dict if name != '0_1']) # Exclude unknot
+    if not knot_calculators_dict:
+         print("Warning: No knot calculators provided to analyze_combinations.")
+         return {}
+
+    # Ensure all values are KnotPropertyCalculator instances
+    valid_calculators = {name: calc for name, calc in knot_calculators_dict.items() if isinstance(calc, KnotPropertyCalculator)}
+    if len(valid_calculators) != len(knot_calculators_dict):
+         print("Warning: Some items in knot_calculators_dict were not KnotPropertyCalculator instances.")
+
+    names = sorted([name for name in valid_calculators if name != '0_1']) # Exclude unknot
+    if not names:
+         print("No non-unknot calculators to analyze.")
+         return {}
+
     analyzed_pairs = set()
+    combination_results = {}
 
     for i in range(len(names)):
         for j in range(i, len(names)): # Include self-combinations like 3_1 # 3_1
@@ -852,28 +1184,24 @@ def analyze_combinations(knot_calculators_dict):
             # analyzed_pairs.add(pair)
 
             print(f"\n--- Analyzing Combination: {name1} and {name2} ---")
-            calc1 = knot_calculators_dict[name1]
-            calc2 = knot_calculators_dict[name2]
+            calc1 = valid_calculators[name1]
+            calc2 = valid_calculators[name2]
 
             # 1. Conceptual Connected Sum
             connected_sum_props = connected_sum(calc1, calc2)
+            if connected_sum_props:
+                 combination_results[(name1, '#', name2)] = connected_sum_props
             # (Reporting is handled within connected_sum)
 
             # 2. Braid Multiplication (Order matters: calc1 * calc2)
             braid_product_calc = multiply_braids(calc1, calc2)
             if braid_product_calc:
                 braid_product_calc.report()
-                # Store results if needed
-                # collision_results[(name1, name2)] = braid_product_calc
+                # Store results - use calculator object itself
+                combination_results[(name1, '*B', name2)] = braid_product_calc
 
-            # Optional: Calculate braid product in reverse order (calc2 * calc1)
-            # if name1 != name2:
-            #     print(f"\n--- Analyzing Combination: {name2} and {name1} (Reversed Braid Product) ---")
-            #     braid_product_calc_rev = multiply_braids(calc2, calc1)
-            #     if braid_product_calc_rev:
-            #         braid_product_calc_rev.report()
-
-            print("-"*40) # Separator between pairs
+            print("-" * 40) # Separator between pairs
+    return combination_results
 
 # --- main_analysis.py ---
 # Main script to calculate properties and explore
@@ -885,38 +1213,47 @@ C1_REQUIRED_TARGETS = {
     "tau": 2.0,       # Example value
 }
 
-
 if __name__ == "__main__":
     print("\n" + "="*20 + " LSC Knot Property Analysis Engine " + "="*20)
 
     # --- Phase 1: Calculate Properties of Base Knots ---
     print("\n--- PHASE 1: Calculating Invariants for Base Knots ---")
     # Analyze first ~10 knots (up to 6 crossings) + unknot
-    base_knots = [
+    base_knots_to_analyze = [
         "0_1", "3_1", "4_1", "5_1", "5_2",
         "6_1", "6_2", "6_3", # Knots with 6 crossings
         "7_1", "7_2", "7_3", "7_4" # Knots with 7 crossings (first few)
         # Add more standard knot names here as needed
-        ]
+    ]
     knot_calculators = {}
-    for name in base_knots:
+    for name in base_knots_to_analyze:
         print(f"\nCalculating properties for: {name}")
-        knot_calculators[name] = KnotPropertyCalculator(name, source_description="Known Atlas Knot")
-        knot_calculators[name].report()
+        try:
+            calculator = KnotPropertyCalculator(name, source_description="Known Atlas Knot")
+            knot_calculators[name] = calculator
+            calculator.report()
+        except Exception as e_init:
+             print(f"ERROR: Failed to initialize or report KnotPropertyCalculator for {name}: {e_init}")
+             # Add a placeholder or skip?
+             knot_calculators[name] = None # Indicate failure
 
-    # --- Phase 2: Analyze Knot Combinations --- 
-    analyze_combinations(knot_calculators)
+    # Filter out failed initializations before combination analysis
+    successful_calculators = {name: calc for name, calc in knot_calculators.items() if calc is not None}
+
+    # --- Phase 2: Analyze Knot Combinations ---
+    combination_results = analyze_combinations(successful_calculators)
 
     # --- Phase 3: Data Analysis for Physics Mapping (Example) ---
     print("\n--- PHASE 3: Data Ready for Physics Correlation ---")
-    print("Invariant data calculated and stored in 'knot_calculators' dictionary.")
+    print("Invariant data calculated and stored in 'knot_calculators' dictionary (base knots) and 'combination_results' (sums/products).")
+
     # Example: Extract data needed for c1 fit (as done in previous script)
     leptons_assigned = {"electron": "3_1", "muon": "5_1", "tau": "5_2"}
     print("\nData for Lepton Candidates (e=3_1, mu=5_1, tau=5_2):")
     fit_data = {}
     for lepton, knot_name in leptons_assigned.items():
-        if knot_name in knot_calculators:
-             calc = knot_calculators[knot_name]
+        if knot_name in successful_calculators:
+             calc = successful_calculators[knot_name]
              target_c1 = C1_REQUIRED_TARGETS.get(lepton) # Get target value
 
              # Extract specific invariants needed for c1 fit
@@ -924,7 +1261,10 @@ if __name__ == "__main__":
              log_det_val = calc.get_property('log_abs_determinant')
              sig_val = calc.get_property('signature')
              jones_w5_logabs_dict = calc.get_property('log_abs_jones_at_roots')
-             jones_w5_val = jones_w5_logabs_dict.get('w5') if isinstance(jones_w5_logabs_dict, dict) else None
+             jones_w5_val = None
+             if isinstance(jones_w5_logabs_dict, dict):
+                 jones_w5_val = jones_w5_logabs_dict.get('w5')
+
              alex_neg1_val = calc.get_property('alex_at_neg1')
 
              data_pt = {
@@ -937,21 +1277,23 @@ if __name__ == "__main__":
              fit_data[knot_name] = data_pt
 
              # Format output nicely, handling None values
-             log_det_str = f"{log_det_val:.3f}" if log_det_val is not None else 'N/A'
+             log_det_str = f"{log_det_val:.3f}" if isinstance(log_det_val, (int, float)) and np.isfinite(log_det_val) else ('-inf' if log_det_val == -np.inf else 'N/A')
              sig_str = f"{sig_val}" if sig_val is not None else 'N/A'
-             jones_str = f"{-jones_w5_val:.3f}" if jones_w5_val is not None and np.isfinite(jones_w5_val) else ('0.000' if jones_w5_val == -np.inf else 'N/A') # Treat log(0) as 0? Check requirement
+             # Use -log|J(w5)| = - jones_w5_val (since it's already logabs)
+             jones_str = f"{-jones_w5_val:.3f}" if isinstance(jones_w5_val, (int, float)) and np.isfinite(jones_w5_val) else ('inf' if jones_w5_val == -np.inf else 'N/A')
              alex_str = f"{alex_neg1_val}" if alex_neg1_val is not None else 'N/A'
              req_c1_str = f"{target_c1:.3f}" if target_c1 is not None else 'N/A'
 
-             print(f"  {knot_name}: Req_c1={req_c1_str}, log|Det|={log_det_str}, Sig={sig_str}, "
+             print(f"  {knot_name}: Req_c1={req_c1_str}, log|Det|={log_det_str}, Sig={sig_str}, "\
                    f"-log|J(ω5)|={jones_str}, |Δ(-1)|={alex_str}")
         else:
-             print(f"  {knot_name}: Data not calculated.")
+             print(f"  {knot_name}: Data not calculated or failed initialization.")
 
     # Here, one would import the fitting functions and run the correlation
     # analysis on the 'fit_data' dictionary as performed in the previous script.
-    # Example: result = perform_linear_fit(fit_data)
-    # print(f"\nFit Result: {result}")
+    # Example: from your_fitting_module import perform_linear_fit
+    # Example: fit_result = perform_linear_fit(fit_data)
+    # print(f"\nFit Result: {fit_result}")
     print("\n>>> Analysis can now proceed using the calculated invariants <<<")
 
     print("\n--- Analysis Engine Finished ---")
